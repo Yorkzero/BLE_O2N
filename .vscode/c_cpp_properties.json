@@ -1,0 +1,40 @@
+{
+    "configurations": [
+        {
+            "name": "win32",
+            "includePath": [
+                ".\\..\\..\\..\\IAR\\stm8\\inc",
+                ".\\..\\..\\..\\IAR\\stm8\\inc\\c",
+                ".\\..\\..\\..\\IAR\\stm8\\inc\\ecpp",
+                ".\\..\\..\\..\\IAR\\stm8\\lib",
+                ".\\src",
+                ".\\STM8L15x_StdPeriph_Driver\\src",
+                ".\\STM8L15x_StdPeriph_Driver\\inc",
+                ".\\general_function"
+            ],
+            "defines": [
+                "STM8L15X_MD",
+                "DEBUG",
+                "__VSCODE_CPPTOOL"
+            ],
+            "intelliSenseMode": "${default}",
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    ".\\..\\..\\..\\IAR\\stm8\\inc\\*",
+                    ".\\..\\..\\..\\IAR\\stm8\\inc\\c\\*",
+                    ".\\..\\..\\..\\IAR\\stm8\\inc\\ecpp\\*",
+                    ".\\..\\..\\..\\IAR\\stm8\\lib\\*",
+                    ".\\src\\*",
+                    ".\\STM8L15x_StdPeriph_Driver\\src\\*",
+                    ".\\STM8L15x_StdPeriph_Driver\\inc\\*",
+                    ".\\general_function\\*"
+                ]
+            },
+            "forcedInclude": [
+                "c:\\Users\\yansiyan\\.vscode\\extensions\\cl.eide-1.21.4\\bin\\include\\internal_headers\\iar_stm8_intr.h"
+            ]
+        }
+    ],
+    "version": 4
+}

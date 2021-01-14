@@ -1,0 +1,35 @@
+--silent --redirect _Scanf=_ScanfSmall --redirect _Printf=_PrintfTiny --config lnkstm8l151k4.icf --config_def _CSTACK_SIZE=0x0200 --config_def _HEAP_SIZE=0x0200 --debug_lib
+--map .\build\Debug\BLE_O2N.map
+.\build\Debug\stm8l15x_adc.o
+.\build\Debug\stm8l15x_aes.o
+.\build\Debug\stm8l15x_beep.o
+.\build\Debug\stm8l15x_clk.o
+.\build\Debug\stm8l15x_comp.o
+.\build\Debug\stm8l15x_dac.o
+.\build\Debug\stm8l15x_dma.o
+.\build\Debug\stm8l15x_exti.o
+.\build\Debug\stm8l15x_flash.o
+.\build\Debug\stm8l15x_gpio.o
+.\build\Debug\stm8l15x_i2c.o
+.\build\Debug\stm8l15x_irtim.o
+.\build\Debug\stm8l15x_itc.o
+.\build\Debug\stm8l15x_iwdg.o
+.\build\Debug\stm8l15x_lcd.o
+.\build\Debug\stm8l15x_pwr.o
+.\build\Debug\stm8l15x_rst.o
+.\build\Debug\stm8l15x_rtc.o
+.\build\Debug\stm8l15x_spi.o
+.\build\Debug\stm8l15x_syscfg.o
+.\build\Debug\stm8l15x_tim1.o
+.\build\Debug\stm8l15x_tim2.o
+.\build\Debug\stm8l15x_tim3.o
+.\build\Debug\stm8l15x_tim4.o
+.\build\Debug\stm8l15x_tim5.o
+.\build\Debug\stm8l15x_usart.o
+.\build\Debug\stm8l15x_wfe.o
+.\build\Debug\stm8l15x_wwdg.o
+.\build\Debug\delay.o
+.\build\Debug\bsp_conf.o
+.\build\Debug\main.o
+.\build\Debug\stm8l15x_it.o
+.\build\Debug\user_app.o -o .\build\Debug\BLE_O2N.out

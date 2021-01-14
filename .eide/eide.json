@@ -1,0 +1,75 @@
+{
+    "name": "BLE_O2N",
+    "type": "C51",
+    "mode": "Debug",
+    "toolchain": "IAR_STM8",
+    "uploader": "STVP",
+    "dependenceList": [
+        {
+            "groupName": "custom",
+            "depList": [
+                {
+                    "name": "default",
+                    "incList": [],
+                    "libList": [],
+                    "sourceDirList": [],
+                    "defineList": [
+                        "STM8L15X_MD"
+                    ]
+                }
+            ]
+        },
+        {
+            "groupName": "build-in",
+            "depList": [
+                {
+                    "name": "default",
+                    "incList": [],
+                    "libList": [],
+                    "sourceDirList": [],
+                    "defineList": [
+                        "DEBUG"
+                    ]
+                },
+                {
+                    "name": "toolchain",
+                    "incList": [
+                        ".\\..\\..\\..\\IAR\\stm8\\inc",
+                        ".\\..\\..\\..\\IAR\\stm8\\inc\\c",
+                        ".\\..\\..\\..\\IAR\\stm8\\inc\\ecpp",
+                        ".\\..\\..\\..\\IAR\\stm8\\lib"
+                    ],
+                    "sourceDirList": [],
+                    "libList": [
+                        ".\\..\\..\\..\\IAR\\stm8\\lib"
+                    ],
+                    "defineList": []
+                }
+            ]
+        }
+    ],
+    "compileConfig": {
+        "options": "null"
+    },
+    "srcDirs": [
+        ".\\src",
+        ".\\STM8L15x_StdPeriph_Driver",
+        ".\\general_function"
+    ],
+    "excludeList": [],
+    "outDir": ".\\build",
+    "deviceName": null,
+    "packDir": null,
+    "uploadConfig": {
+        "deviceName": "STM8S105x4",
+        "bin": ".\\build\\Debug\\BLE_O2N.hex",
+        "eepromFile": "null",
+        "optionByteFile": "null"
+    },
+    "miscInfo": {
+        "uid": "abff1f07af9a2e53b6f6980fdb28b3e6",
+        "lastTelTime": 1610499005287,
+        "lastBuildTime": 1610499236699
+    },
+    "version": "1.0"
+}

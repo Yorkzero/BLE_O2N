@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "stm8-debug",
+            "request": "launch",
+            "name": "iar-stm8",
+            "serverType": "st7",
+            "interface": "stlink3",
+            "cpu": "STM8S105x4",
+            "executable": ".\\build\\Debug\\BLE_O2N.out"
+        }
+    ]
+}
