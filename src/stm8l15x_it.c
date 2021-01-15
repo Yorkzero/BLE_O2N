@@ -138,8 +138,7 @@ INTERRUPT_HANDLER(EXTIB_G_IRQHandler, 6)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
- bsp_key_it();
- EXTI_ClearITPendingBit(EXTI_IT_PortB);
+ 
 }
 
 /**

@@ -16,31 +16,28 @@ Date     : 2020-11-23
 #include "main.h"
 
 /*----------- Global Definitions and Declarations ----------*/
-extern volatile uint8_t BLE_STA_flag;//BLE state flag 0:MESH, 1:NON-MESH
-extern volatile uint8_t LOCK_STA_flag;//LOCK state flag 0:LOCKED, 1:UNLOCKED
-extern volatile uint8_t SYS_STA_flag;//system state flag 0:halt, 1:run
+//Use bit fields to define flag
+typedef struct sysFlag
+{
+  uint8_t BLE_STA_flag:1;//BLE state flag 0:MESH, 1:NON-MESH
+  uint8_t LOCK_STA_flag:1;//LOCK state flag 0:LOCKED, 1:UNLOCKED
+  uint8_t SYS_STA_flag:1;//system state flag 0:halt, 1:run
+  uint8_t INIT_STA_flag:1;//initialization state flag 0:not initialized yet, 1:initialized ready
+  uint8_t e:1;//unused
+  uint8_t f:1;//unused
+  uint8_t g:1;//unused
+  uint8_t h:1;//unused
+}myFlag;
+extern volatile myFlag myflag;
 #if (RELAY_DEV == DEVICE_ID)
 extern volatile uint8_t ctrl_string[];//used to control LED group
 extern volatile uint8_t sta_string[];//used to record node status
 #endif
 /*-------------------- Type Declarations -------------------*/
-#define DEBUG_STATUS 0 //record the status of function
-
 /*------------------ Variable Declarations -----------------*/
 
 
 /*------------------- Function Prototype -------------------*/
-/*************************************************************
-Function Name       : AT_Test_Demo
-Function Description: AT instuction test
-Param_in            : 
-Param_out           : 
-Return Type         : 
-Note                : 
-Author              : Yan
-Time                : 2020-11-23
-*************************************************************/
-void AT_Test_Demo(void);
 /*************************************************************
 Function Name       : AT_Send
 Function Description: send AT cmd
@@ -67,23 +64,6 @@ Author              : Yan
 Time                : 2020-11-27
 *************************************************************/
 uint8_t AT_Get_State(char *sta);
-#if DEBUG_STATUS
-/*************************************************************
-Function Name       : BLE_AT_Init
-Function Description: Bluetooth initialization
-Param_in            : char *name, char *mode
-                      M: master/S: slave/F: mesh/B: broadcast or iBeacon
-Param_out           : 
-Return Type         : u16 tag 
-Note                : 0: succeed/1: failed
-Author              : Yan
-Time                : 2020-11-27
-------------------------------------------
-log                 : 2020-11-28
-                      debug ing, can not be used!
-*************************************************************/
-uint8_t BLE_AT_Init(char *name, char *mode);
-#endif
 /*************************************************************
 Function Name       : BLE_status_it
 Function Description: Use peripherals to express BLE status
@@ -107,16 +87,27 @@ Time                : 2020-12-04
 *************************************************************/
 void BLE_status_run(void);
 /*************************************************************
-Function Name       : user_app_run
-Function Description: use key/phone to control led
+Function Name       : BLE_Init
+Function Description: initialization of BLE
 Param_in            : 
 Param_out           : 
 Return Type         : 
-Note                : 
+Note                : Pull down the RTS level for at least 50ms before use
 Author              : Yan
-Time                : 2020-11-25
+Time                : 2021-01-15
 *************************************************************/
-void user_app_run(void);
+void BLE_Init(void);
+/*************************************************************
+Function Name       : BLE_MESH
+Function Description: add up to 3 slave device to list
+Param_in            : 
+Param_out           : 
+Return Type         : uint8_t flag
+Note                : 0: succeed/1: failed
+Author              : Yan
+Time                : 2021-01-15
+*************************************************************/
+uint8_t BLE_MESH(void);
 /*************************************************************
 Function Name       : ble_lock
 Function Description: used to send lock or unlock cmd

@@ -1,14 +1,24 @@
-[2021-01-13 08:51:23]	compilation failed at : "d:\myfile_yan\BLE-MESH\BLE_O2N\STM8L15x_StdPeriph_Driver\src\stm8l15x_rst.c", exit code: 2
-   在 unify_builder.Program.compileByMulThread(Int32 thrNum, CmdInfo[] cmds, List`1 doneList)
+[2021-01-15 15:44:13]	compilation failed at : "d:\myfile_yan\BLE-MESH\BLE_O2N\src\user_app.c", exit code: 2
    在 unify_builder.Program.Main(String[] args)
 
-[2021-01-13 08:52:58]	compilation failed at : "d:\myfile_yan\BLE-MESH\BLE_O2N\STM8L15x_StdPeriph_Driver\src\stm8l15x_itc.c", exit code: 2
-   在 unify_builder.Program.compileByMulThread(Int32 thrNum, CmdInfo[] cmds, List`1 doneList)
+[2021-01-15 15:44:20]	compilation failed at : "d:\myfile_yan\BLE-MESH\BLE_O2N\src\user_app.c", exit code: 2
    在 unify_builder.Program.Main(String[] args)
 
-[2021-01-13 08:53:59]	[done]
+[2021-01-15 15:45:18]	[done]
 	build successfully !
 
-[2021-01-14 14:20:50]	[done]
+[2021-01-15 15:45:24]	[done]
+	build successfully !
+
+[2021-01-15 16:26:10]	[done]
+	build successfully !
+
+[2021-01-15 16:38:05]	[done]
+	build successfully !
+
+[2021-01-15 16:38:21]	[done]
+	build successfully !
+
+[2021-01-15 16:39:09]	[done]
 	build successfully !
 

@@ -47,18 +47,16 @@ int main(void)
     GPIO_Init(SIM_TX_PORT, SIM_TX_PIN, GPIO_Mode_Out_PP_High_Fast);
 #endif
 
-#if (3 == CODE_VERSION)//Version 3     
+#if (1 == CODE_VERSION)//Version 1     
     KEY_ENABLE();
-    // LINK_ENABLE();
     delay_ms_1(100);
     __enable_interrupt();
-    delay_ms_1(500);
-    //init
+    //init buff
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     USART1_RX_STA = 0;    
     while(1)
     {
-        halt();
+        // halt();
     }
 #endif
 }

@@ -19,9 +19,16 @@ Date     : 2020-11-23
 /*-------------------- Type Declarations -------------------*/
 
 /*------------------ Variable Declarations -----------------*/
-volatile uint8_t BLE_STA_flag = 1;//BLE state flag 0:MESH, 1:NON-MESH
-volatile uint8_t LOCK_STA_flag = 1;//LOCK state flag 0:LOCKED, 1:UNLOCKED
-volatile uint8_t SYS_STA_flag = 0;//system state flag 0:halt, 1:run
+volatile myFlag myflag = {
+                            1,  //BLE state flag 0:MESH, 1:NON-MESH
+                            1,  //LOCK state flag 0:LOCKED, 1:UNLOCKED
+                            1,  //system state flag 0:halt, 1:run
+                            0,  //initialization state flag 0:not initialized yet, 1:initialized ready
+                            0,  //unused
+                            0,  //unused
+                            0,  //unused
+                            0,  //unused
+                         }; 
 #if (1 == DEVICE_ID)
 volatile uint8_t ctrl_string[] = "::000";//used to control LED group
 volatile uint8_t sta_string[] = "0000000000";//used to record node status
@@ -30,23 +37,8 @@ volatile uint8_t sta_string[] = "0000000000";//used to record node status
 
 
 /*------------------- Function Implement -------------------*/
-/*************************************************************
-Function Name       : AT_Test_Demo
-Function Description: AT instuction test
-Param_in            : 
-Param_out           : 
-Return Type         : 
-Note                : 
-Author              : Yan
-Time                : 2020-11-23
-*************************************************************/
-void AT_Test_Demo(void)
-{
-    
-    
-    
-}
-#if (2 == CODE_VERSION)//Version 2  
+
+#if (1 == CODE_VERSION)//Version 1  
 /*************************************************************
 Function Name       : AT_Send
 Function Description: send AT cmd
@@ -62,7 +54,6 @@ uint8_t AT_Send(uint8_t *atcmd)
 {
     uint16_t tag = 1;
     uint8_t t;
-    // uint16_t k;
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     uint8_t retry = 10;//number of AT command sending attempts
@@ -75,7 +66,6 @@ uint8_t AT_Send(uint8_t *atcmd)
             if(USART1_RX_STA & 0x8000)
                 break;
             delay_ms_1(5);
-            // k = TIM3_GetCounter();
         }
         if ((USART1_RX_STA & 0x8000))//receive the data
         {
@@ -98,57 +88,7 @@ uint8_t AT_Send(uint8_t *atcmd)
     return tag;
 }
 #endif
-#if (3 == CODE_VERSION)//FSC-BT686
-/*************************************************************
-Function Name       : AT_Send
-Function Description: send AT cmd
-Param_in            : uint8_t *atcmd
-Param_out           : 
-Return Type         : u16 tag
-Note                : 0: succeed/1: failed
-Author              : Yan
-Time                : 2021-1-8
-*************************************************************/
-uint8_t AT_Send(uint8_t *atcmd)
-{
-    uint16_t tag = 1;
-    uint8_t t;
-    // uint16_t k;
-    USART1_RX_STA = 0;
-    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-    uint8_t retry = 10;//number of AT command sending attempts
-    while (retry--)
-    {
-        USART1_SendWord(atcmd);
-        delay_ms_1(10);
-        for (t = 0; t < 10; t++)
-        {
-            if(USART1_RX_STA & 0x8000)
-                break;
-            delay_ms_1(5);
-            // k = TIM3_GetCounter();
-        }
-        if ((USART1_RX_STA & 0x8000))//receive the data
-        {
-            tag = USART1_RX_STA & 0x7FFF;//get the length of data
-            USART1_RX_STA = 0;//clear the state flag
-            if ((('O' == USART1_RX_buf[tag-4]) &&
-                ('K' == USART1_RX_buf[tag-3])) ||
-                (('o' == USART1_RX_buf[tag-4]) &&
-                ('k' == USART1_RX_buf[tag-3])))
-            {
-                tag = 0;//enter succeed
-                break;
-            }
-        }
-    }
-    //clear the rx buffer
-    USART1_RX_STA = 0;
-    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-    if(0 == retry)tag = 1;//enter failed
-    return tag;
-}
-#endif
+
 /*************************************************************
 Function Name       : AT_Get_State
 Function Description: use AT to get BLE state
@@ -216,66 +156,6 @@ uint8_t AT_Get_State(char *sta)
     if(0 == retry)tag = 1;//enter failed
     return tag;
 }
-#if DEBUG_STATUS//Currently unavailable
-/*************************************************************
-Function Name       : BLE_AT_Init
-Function Description: Bluetooth initialization
-Param_in            : char *name, char *mode
-                      M: master/S: slave/F: mesh/B: broadcast or iBeacon
-Param_out           : 
-Return Type         : u16 tag 
-Note                : 0: succeed/1: failed
-Author              : Yan
-Time                : 2020-11-27
-*************************************************************/
-uint8_t BLE_AT_Init(char *name, char *mode)
-{
-    uint16_t tag  = 1;
-    uint16_t tag1 = 1;
-    uint16_t tag2 = 1;
-    uint8_t t;
-    uint8_t retry = 10;  //number of AT command sending attempts
-    // char *namestr = connect2("AT+NAME=", name);
-    // char *modestr = connect2("AT+MODE=", mode);
-    while (retry--)
-    {
-        ENTER_AT();//Enter AT command mode
-        delay_ms_1(10);
-        for ( t = 0; t < 10; t++)//50ms outtime
-        {
-            if(USART1_RX_STA & 0x8000)
-                break;
-            delay_ms_1(5);
-        }
-        if ((USART1_RX_STA & 0x8000))//receive the data
-        {
-            tag = USART1_RX_STA & 0x7FFF;//get the length of data
-            USART1_RX_STA = 0;//clear the state flag
-            if (tag == 6
-            && ('a' == USART1_RX_buf[0]) && ('+' == USART1_RX_buf[1]) && ('O' == USART1_RX_buf[2]) && ('K' == USART1_RX_buf[3]))
-            {
-                tag = 0;//enter succeed 
-                break;  
-            }
-            
-        }
-    }
-    
-    if(!tag && (0 != retry))
-    {
-        tag1 = AT_Send((uint8_t *)(connect3("AT+NAME=", name, "\r\n")));
-        tag2 = AT_Send((uint8_t *)(connect3("AT+MODE=", mode, "\r\n")));
-    }    
-    EXIT_AT();//exit AT command mode
-    
-    if ((0 == retry) || tag1 || tag2)
-    {
-        tag = 1;//init failed
-    }
-    return tag;
-    
-}
-#endif
 /*************************************************************
 Function Name       : BLE_status_it
 Function Description: Use peripherals to express BLE status
@@ -312,12 +192,12 @@ void BLE_status_it(void)
             if ('e' == USART1_STA_buf[1])//MESH mode
             {
                 memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));//clear the buffer
-                BLE_STA_flag = 0;
+                myflag.BLE_STA_flag = 0;
             }
             else//Non-MESH mode
             {
                 memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));//clear the buffer
-                BLE_STA_flag = 1;
+                myflag.BLE_STA_flag = 1;
             }
             
         }
@@ -347,7 +227,7 @@ void BLE_status_run(void)
 {
     // LEDR_L();
     // LEDG_L();
-    if (1 == BLE_STA_flag)//NON-MESH
+    if (1 == myflag.BLE_STA_flag)//NON-MESH
     {
         
         LEDG_R();
@@ -366,180 +246,48 @@ void BLE_status_run(void)
     
 }
 /*************************************************************
-Function Name       : user_app_run
-Function Description: use key/phone to control led
+Function Name       : BLE_Init
+Function Description: initialization of BLE
 Param_in            : 
 Param_out           : 
 Return Type         : 
-Note                : 
+Note                : Pull down the RTS level for at least 50ms before use
 Author              : Yan
-Time                : 2020-11-25
---------------------------------------------------------------
-log                 : 2020-12-7
-                      This function changed to control LED group
-                      2020-12-9
-                      This function added the features of phone 
-                      control LED group
+Time                : 2021-01-15
 *************************************************************/
-void user_app_run(void)
+void BLE_Init(void)
 {
-#if (RELAY_DEV != DEVICE_ID)
-    if((USART1_RX_STA & (uint16_t)(1<<15)) == 0)//No message
-    {
-        // SYS_STA_flag = 0;
+    if (1 == myflag.INIT_STA_flag)//avoid init again
         return;
-    }
-            
-    if(('0' != USART1_RX_buf[2]) && ('1' != USART1_RX_buf[2]))//non-key message
-    {
-        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-        USART1_RX_STA = 0;
-        // SYS_STA_flag = 0;
-        return;
-    }
-    if('f' == USART1_RX_buf[0])
-    {
-        ble_lock(ENABLE);
-        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-        USART1_RX_STA = 0;
-        SYS_STA_flag = 0;
-        return;
-    }
-    if('d' == USART1_RX_buf[0])
-    {
-        ble_lock(DISABLE);
-        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-        USART1_RX_STA = 0;
-        SYS_STA_flag = 0;
-        return;
-    }
-    if((USART1_RX_STA & (uint16_t)(1<<15)) == 32768)//Get key message
-    {
-        uint8_t id, id_lb, id_hb;
-        id_hb = USART1_RX_buf[0];
-        id_lb = USART1_RX_buf[1];
-        id_hb -= 48;
-        id_lb -= 48;
-        id = id_hb * 10 +id_lb;
-        if(DEVICE_ID == id)
-        {
-            if ('0' == USART1_RX_buf[2])
-            {
-                ble_lock(ENABLE);
-            }
-            if ('1' == USART1_RX_buf[2])
-            {
-                ble_lock(DISABLE);
-            }
-            memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-            USART1_RX_STA = 0;
-            SYS_STA_flag = 0;    
-        }
-        else
-        {
-            memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-            USART1_RX_STA = 0;  
-            SYS_STA_flag = 0;  
-        }
-    }
-#endif
-#if (RELAY_DEV == DEVICE_ID)
-    if(0 == BLE_STA_flag)//process msg when enter mesh mode
-    {
-        delay_ms_1(100);
-        //init
-        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-        USART1_RX_STA = 0;
-        //process
-        uint8_t *temp_string;//intermediate variables
-        temp_string = (uint8_t *)ctrl_string;
-        mesh_data_transmitts(temp_string);
-        
-        MESH_cmd(DISABLE);
-        BLE_status_it();
-    }
-    if((USART1_RX_STA & (uint16_t)(1<<15)) == 0)//No message
-        return;
-    if(('f' == USART1_RX_buf[0]) && ('f' == USART1_RX_buf[1]) && ('f' == USART1_RX_buf[2]))//lock all device
-    {
-        ctrl_string[2] = 'f';
-        //clear buf
-        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-        USART1_RX_STA = 0;
-        AT_Send("+++a");
-        AT_Send("AT+DISCONN\r\n");
-        AT_Send("AT+ENTM\r\n");
-        delay_ms_1(100);
-        MESH_cmd(ENABLE);
-        BLE_status_it();
-        return;
-    }
-    if(('d' == USART1_RX_buf[0]) && ('d' == USART1_RX_buf[1]) && ('d' == USART1_RX_buf[2]))//unlock all device
-    {
-        ctrl_string[2] = 'd';
-        //clear buf
-        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-        USART1_RX_STA = 0;
-        AT_Send("+++a");
-        AT_Send("AT+DISCONN\r\n");
-        AT_Send("AT+ENTM\r\n");
-        delay_ms_1(100);
-        MESH_cmd(ENABLE);
-        BLE_status_it();
-        return;
-    }    
-    if(('0' != USART1_RX_buf[2]) && ('1' != USART1_RX_buf[2]))//non-phone message
-    {
-        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-        USART1_RX_STA = 0;
-        return;
-    }
-    if((USART1_RX_STA & (uint16_t)(1<<15)) == 0x8000)//Get phone message
-    {
-        ctrl_string[2] = USART1_RX_buf[0];//id_hb
-        ctrl_string[3] = USART1_RX_buf[1];//id_lb
-        ctrl_string[4] = USART1_RX_buf[2];//id_sta
-
-        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-        USART1_RX_STA = 0;
-        AT_Send("+++a");
-        AT_Send("AT+DISCONN\r\n");
-        AT_Send("AT+ENTM\r\n");
-        delay_ms_1(100);
-        MESH_cmd(ENABLE);
-        BLE_status_it();
-    }
-    // if((USART1_RX_STA & (uint16_t)(1<<15)) == 0x8000)//Get phone message
-    // {
-    //     if (0 != (USART1_RX_STA & 0X0001))//invaild cmd
-    //     {
-    //         USART1_SendWord("Invaild message...");
-    //         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-    //         USART1_RX_STA = 0;
-    //         return;
-    //     }
-    //     uint8_t id;//get the id
-    //     uint8_t sta;//get the status
-    //     uint16_t i = 0;
-    //     while (i < (USART1_RX_STA & 0x7fff))
-    //     {
-    //         id = USART1_RX_buf[i];
-    //         sta = USART1_RX_buf[i+1];
-    //         id -= 48;//ascii code offset compasation
-    //         ctrl_string[id+1] = sta;
-    //         i += 2;
-    //     }
-    //     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-    //     USART1_RX_STA = 0;
-    //     AT_Send("+++a");
-    //     AT_Send("AT+DISCONN\r\n");
-    //     AT_Send("AT+ENTM\r\n");
-    //     delay_ms_1(100);
-    //     MESH_cmd(ENABLE);
-    //     BLE_status_it();
-    // }
+    AT_Send("+++");//enter AT mode
+    AT_Send("AT+ROLE=2\r\n");//set the role: slave and master
+    AT_Send("AT+POWER=-30\r\n");//set the TX power as -30db
+    AT_Send("AT+CNT_INTERVAL=24\r\n");//set the connect interval as (24 * 1.25 = 30)ms
+    AT_Send("AT+ADS=1,1,1000\r\n");//set the advertise interval as 1000ms
+    AT_Send("AT+ADV_DATA=1,1234\r\n");//set the advertisement data: 1234
+    AT_Send("AT+RESTART\r\n");//restart the device
+    AT_Send("AT+EXIT\r\n");
+    myflag.INIT_STA_flag = 1;//init ok
+}
+/*************************************************************
+Function Name       : BLE_MESH
+Function Description: add up to 3 slave device to list
+Param_in            : 
+Param_out           : 
+Return Type         : uint8_t flag
+Note                : 0: succeed/1: failed
+Author              : Yan
+Time                : 2021-01-15
+*************************************************************/
+uint8_t BLE_MESH(void)
+{
+    if (0 == myflag.BLE_STA_flag)//non-mesh
+        return 0;
+    uint8_t flag = 1;
+    AT_Send("+++");//enter AT mode
+    AT_Send("AT+OBSERVER=1\r\n");//enter scan mode
     
-#endif
+
 }
 /*************************************************************
 Function Name       : ble_lock
@@ -554,19 +302,19 @@ Time                : 2020-12-18
 void ble_lock(FunctionalState Newstate)
 {
     assert_param(IS_FUNCTIONAL_STATE(Newstate));
-    if((ENABLE == Newstate) && (1 == LOCK_STA_flag))//lock the door
+    if((ENABLE == Newstate) && (1 == myflag.LOCK_STA_flag))//lock the door
     {
         MOTO_FW();
         delay_ms_1(250);
         MOTO_WT();
-        LOCK_STA_flag = 0;//change the flag
+        myflag.LOCK_STA_flag = 0;//change the flag
     }
-    else if ((DISABLE == Newstate) && (0 == LOCK_STA_flag))//open the door
+    else if ((DISABLE == Newstate) && (0 == myflag.LOCK_STA_flag))//open the door
     {
         MOTO_BW();
         delay_ms_1(250);
         MOTO_WT();
-        LOCK_STA_flag = 1;//change the flag
+        myflag.LOCK_STA_flag = 1;//change the flag
     }
     
 }

@@ -17,11 +17,10 @@ Date     : 2020-11-20
 
 /*----------- Global Definitions and Declarations ----------*/
 //USART1相关宏定义
-#define USART1_RX_MAX_LEN      100  //最大接收缓存字节
-#define USART1_STA_MAX_LEN     100  //最大状态量缓存字节
+#define USART1_RX_MAX_LEN      250  //最大接收缓存字节
+#define USART1_STA_MAX_LEN     20  //最大状态量缓存字节
 
 extern volatile uint8_t key_flag;   //key state flag
-extern volatile uint8_t exti4_sta_flag;  //used to know which IO(PC4/PB4) triggers the IT. sta: 0(PC4), 1(PB4)
 extern volatile uint32_t beep_play_time; //record the beep play time
 extern volatile uint16_t USART1_RX_STA;  //record the receive data
 extern uint8_t USART1_RX_buf[USART1_RX_MAX_LEN];//USART1 receive buffer
@@ -57,17 +56,6 @@ Time                : 2020-11-20
 *************************************************************/
 void bsp_clk_init(void);
 /*************************************************************
-Function Name       : bsp_key_it
-Function Description: key state detection
-Param_in            : 
-Param_out           : 
-Return Type         : 
-Note                : everytime clicking the button will reverse the key_flag
-Author              : Yan
-Time                : 2020-11-20
-*************************************************************/
-void bsp_key_it(void);
-/*************************************************************
 Function Name       : bsp_key_detec
 Function Description: used to detec press time
 Param_in            : 
@@ -79,28 +67,6 @@ Author              : Yan
 Time                : 2020-11-30
 *************************************************************/
 void bsp_key_detec(void);
-/*************************************************************
-Function Name       : link_sta_detec
-Function Description: ble Link state detection
-Param_in            : 
-Param_out           : 
-Return Type         : 
-Note                : use green led to show the ble state
-Author              : Yan
-Time                : 2020-11-23
-*************************************************************/
-void link_sta_detec(void);
-/*************************************************************
-Function Name       : EXTI4_Sta_detec
-Function Description: Used to avoid interruption detection confusion
-Param_in            : 
-Param_out           : 
-Return Type         : 
-Note                : PC4(LINK_STA)/PB4(KEY_STA) mixed
-Author              : Yan
-Time                : 2020-11-26
-*************************************************************/
-void EXTI4_Sta_detec(void);
 /*************************************************************
 Function Name       : bsp_tim2_init
 Function Description: initialization of TIM2
@@ -245,17 +211,6 @@ Time                : 2020-11-23
 *************************************************************/
 void USART1_SendWord(uint8_t *Data);
 /*************************************************************
-Function Name       : MESH_cmd
-Function Description: enable or disable mesh
-Param_in            : FunctionalState NewState
-Param_out           : 
-Return Type         : 
-Note                : This parameter can be ENABLE or DISABLE
-Author              : Yan
-Time                : 2020-11-30
-*************************************************************/
-void MESH_cmd(FunctionalState NewState);
-/*************************************************************
 Function Name       : data_packet_process
 Function Description: used to process and send long data(>20byte)
 Param_in            : uint8_t *longdata
@@ -278,16 +233,16 @@ Time                : 2020-12-10
 *************************************************************/
 void node_info_query(void);
 /*************************************************************
-Function Name       : mesh_data_transmitts
-Function Description: used to transmitt mesh data
-Param_in            : uint8_t *mesh_data
+Function Name       : scan_packet_process
+Function Description: used to process scan packet
+Param_in            : uint16_t scan_cnt(10~30ms per scan)
 Param_out           : 
-Return Type         : 
-Note                : 
+Return Type         : uint8_t flag
+Note                : the num of the slave device(x=0, 1, 2, 3)
 Author              : Yan
-Time                : 2020-12-21
+Time                : 2021-01-15
 *************************************************************/
-void mesh_data_transmitts(uint8_t *mesh_data);
+uint8_t scan_packet_process(uint16_t scan_cnt);
 //模拟串口打印
 #if (SIM_UART_PRINTF_EN)
 extern void sim_uart_printf(uint8_t data);

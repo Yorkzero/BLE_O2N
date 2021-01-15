@@ -46,11 +46,14 @@ Date     : 2020-11-20
 #define KEY_DISABLE()   GPIO_Init(KEY_PORT, KEY_PIN, GPIO_Mode_In_PU_No_IT)//KEY NO IT
 #define KEY_READ()      (KEY_PORT->IDR & KEY_PIN)   //read the key value(active low)
 
-#define BLE_RST_PORT    GPIOD      //ble reset
-#define BLE_RST_PIN     GPIO_Pin_1 //ble reset
-#define BLE_STA_R()     BLE_RST_PORT->ODR ^= BLE_RST_PIN
-#define BLE_LINK_PORT   GPIOC      //ble link port
-#define BLE_LINK_PIN    GPIO_Pin_4 //ble link pin
+#define BLE_RESET_PORT      GPIOD      //ble reset
+#define BLE_RESET_PIN       GPIO_Pin_1 //ble reset
+#define BLE_STA_RESET()     BLE_RESET_PORT->ODR & = ~BLE_RESET_PIN
+#define BLE_STA_SET()       BLE_RESET_PORT->ODR | = BLE_RESET_PIN
+#define BLE_RTS_PORT        GPIOC      //ble rts port
+#define BLE_RTS_PIN         GPIO_Pin_4 //ble rts pin
+#define BLE_SEND_ENABLE()   BLE_RESET_PORT->ODR & = ~BLE_RESET_PIN
+#define BLE_SEND_DISABLE()  BLE_RESET_PORT->ODR | = BLE_RESET_PIN
 //#define EXTI_LINK_PIN   EXTI_Pin_4  //ble exti link pin
 #define LINK_ENABLE()   GPIO_Init(BLE_LINK_PORT, BLE_LINK_PIN, GPIO_Mode_In_PU_IT)     //LINK IT
 #define LINK_DISABLE()  GPIO_Init(BLE_LINK_PORT, BLE_LINK_PIN, GPIO_Mode_In_PU_NO_IT)  //LINK NO IT
@@ -139,7 +142,7 @@ enum
 #define SYS_CLK_FREQ          SYS_CLK_FREQ_16M    
 
 #define SIM_UART_PRINTF_EN 0 //模拟打印开关
-#define CODE_VERSION 3       //用于版本号控制
+#define CODE_VERSION 1       //用于版本号控制
 #define RELAY_DEV 1
 #define DEVICE_ID RELAY_DEV          //用于匹配目前的设备ID(ID = 0, 1, 2...)其中D1负责桥接MESH内外设备
 #define PACKET_MAX_LEN 20   //适配WH-BLE103的分包大小(20byte)
