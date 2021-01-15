@@ -22,3 +22,51 @@
 [2021-01-15 16:39:09]	[done]
 	build successfully !
 
+[2021-01-15 16:45:17]	link failed !, exit code: 2
+   在 unify_builder.Program.Main(String[] args)
+
+[2021-01-15 16:45:45]	[done]
+	build successfully !
+
+[2021-01-15 16:46:49]	link failed !, exit code: 2
+   在 unify_builder.Program.Main(String[] args)
+
+[2021-01-15 16:48:42]	[done]
+	build successfully !
+
+[2021-01-15 16:48:59]	[done]
+	build successfully !
+
+[2021-01-15 16:52:29]	[done]
+	build successfully !
+
+[2021-01-15 16:52:45]	[done]
+	build successfully !
+
+[2021-01-15 16:53:15]	[done]
+	build successfully !
+
+[2021-01-15 16:53:50]	[done]
+	build successfully !
+
+[2021-01-15 16:54:03]	[done]
+	build successfully !
+
+[2021-01-15 17:00:30]	[done]
+	build successfully !
+
+[2021-01-15 17:07:00]	[done]
+	build successfully !
+
+[2021-01-15 17:08:42]	[done]
+	build successfully !
+
+[2021-01-15 17:09:37]	[done]
+	build successfully !
+
+[2021-01-15 17:09:50]	[done]
+	build successfully !
+
+[2021-01-15 17:10:06]	[done]
+	build successfully !
+

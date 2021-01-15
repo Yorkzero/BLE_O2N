@@ -630,6 +630,14 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
 {
     uint8_t flag = 0;
     uint8_t t,tag;
+    /**
+     * value    |   feature
+     * 0        |   head and tail
+     * 1        |   head and non-tail
+     * 2        |   non-head and tail
+     * 3        |   non-head and non-tail
+     **/
+    uint8_t packet_sta = 0;//used to characterize the data status of the last cycle
     uint16_t retry = scan_cnt;
     while (retry--)
     {
