@@ -145,7 +145,7 @@ uint8_t AT_Get_State(char *sta)
     if(!tag && (0 != retry))
     {
         uint16_t i = 0;  
-        for (t = 4 + stalen; t < (temp - 6); t++)
+        for (t = 6 + stalen; t < (temp - 6); t++)
         {   //storage the relevant data in the buffer, empty it when access.   
             USART1_STA_buf[i] = USART1_RX_buf[t];
             i++;
@@ -286,9 +286,12 @@ uint8_t BLE_MESH(void)
     uint8_t flag = 1;
     AT_Send("+++");//enter AT mode
     AT_Send("AT+OBSERVER=1\r\n");//enter scan mode
+    uint8_t num = scan_packet_process(100);
+    AT_Get_State("DEV_DEL");
     
 
 }
+
 /*************************************************************
 Function Name       : ble_lock
 Function Description: used to send lock or unlock cmd
