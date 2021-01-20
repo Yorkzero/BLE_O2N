@@ -344,5 +344,37 @@ char *connect3(char *a, char *b, char *d) {
     tempc = NULL;
     return tempv;
 }
+uint8_t strStr(uint8_t* haystack, uint8_t* needle) {
+    uint8_t m=strlen(haystack);//计算两字符串长度
+    uint8_t n=strlen(needle);
+    if(n==0) return 0;
+    
+    for(uint8_t i=0;i<m;i++){
+        uint8_t j=0;
+        uint8_t k=i;
+        while(haystack[k]==needle[j] && j<n){//比较各字符是否相等来确定haystack中是否存在needle
+            k++;
+            j++;
+            if(haystack[k]!=needle[j] && j<n){
+                break;
+            }
+            
+        }
+        if(j==n){  //比较到第n个（needle[n-1]），如果都相等，则说明存在，返回haystack中与needle第一个相同字符的编号
+                return (i+1);
+            }
+    }
+    return 0;
+}
+void Reverse(uint8_t *p , uint8_t size)
+{
+    uint8_t i  , tmp;
+    for(i = 0 ; i < size/2 ; i++)
+    {
+         tmp = p[i] ; 
+         p[i] = p[size-1-i] ; 
+         p[size-1-i] = tmp ;    
+    }    
+}
 /*---------------------------------------------------------------------------*/
 

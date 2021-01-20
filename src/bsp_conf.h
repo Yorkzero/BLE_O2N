@@ -17,7 +17,7 @@ Date     : 2020-11-20
 
 /*----------- Global Definitions and Declarations ----------*/
 //USART1相关宏定义
-#define USART1_RX_MAX_LEN      250  //最大接收缓存字节
+#define USART1_RX_MAX_LEN      150  //最大接收缓存字节
 #define USART1_STA_MAX_LEN     100  //最大状态量缓存字节
 
 extern volatile uint8_t key_flag;   //key state flag
@@ -25,6 +25,7 @@ extern volatile uint32_t beep_play_time; //record the beep play time
 extern volatile uint16_t USART1_RX_STA;  //record the receive data
 extern uint8_t USART1_RX_buf[USART1_RX_MAX_LEN];//USART1 receive buffer
 extern uint8_t USART1_STA_buf[USART1_STA_MAX_LEN];//USART1 state buffer
+
 /*-------------------- Type Declarations -------------------*/
 
 
@@ -235,7 +236,7 @@ void node_info_query(void);
 /*************************************************************
 Function Name       : scan_packet_process
 Function Description: used to process scan packet
-Param_in            : uint16_t scan_cnt(10~30ms per scan)
+Param_in            : uint16_t scan_cnt(1~50ms per scan)
 Param_out           : 
 Return Type         : uint8_t flag
 Note                : the num of the slave device(x=0, 1, 2, 3)

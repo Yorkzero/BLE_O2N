@@ -48,12 +48,12 @@ Date     : 2020-11-20
 
 #define BLE_RESET_PORT      GPIOD      //ble reset
 #define BLE_RESET_PIN       GPIO_Pin_1 //ble reset
-#define BLE_STA_RESET()     BLE_RESET_PORT->ODR & = ~BLE_RESET_PIN
-#define BLE_STA_SET()       BLE_RESET_PORT->ODR | = BLE_RESET_PIN
+#define BLE_STA_RESET()     BLE_RESET_PORT->ODR &= ~BLE_RESET_PIN
+#define BLE_STA_SET()       BLE_RESET_PORT->ODR |= BLE_RESET_PIN
 #define BLE_RTS_PORT        GPIOC      //ble rts port
 #define BLE_RTS_PIN         GPIO_Pin_4 //ble rts pin
-#define BLE_SEND_ENABLE()   BLE_RESET_PORT->ODR & = ~BLE_RESET_PIN
-#define BLE_SEND_DISABLE()  BLE_RESET_PORT->ODR | = BLE_RESET_PIN
+#define BLE_SEND_ENABLE()   BLE_RTS_PORT->ODR &= ~BLE_RTS_PIN
+#define BLE_SEND_DISABLE()  BLE_RTS_PORT->ODR |= BLE_RTS_PIN
 //#define EXTI_LINK_PIN   EXTI_Pin_4  //ble exti link pin
 #define LINK_ENABLE()   GPIO_Init(BLE_LINK_PORT, BLE_LINK_PIN, GPIO_Mode_In_PU_IT)     //LINK IT
 #define LINK_DISABLE()  GPIO_Init(BLE_LINK_PORT, BLE_LINK_PIN, GPIO_Mode_In_PU_NO_IT)  //LINK NO IT

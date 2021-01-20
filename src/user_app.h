@@ -84,6 +84,10 @@ Return Type         :
 Note                : 
 Author              : Yan
 Time                : 2020-12-04
+--------------------------------------------------------------
+log:
+data:  2021-1-19
+note:  use this to display the mesh state
 *************************************************************/
 void BLE_status_run(void);
 /*************************************************************
@@ -108,6 +112,17 @@ Author              : Yan
 Time                : 2021-01-15
 *************************************************************/
 uint8_t BLE_MESH(void);
+/*************************************************************
+Function Name       : BLE_FINISH_MESH
+Function Description: finish mesh and send mesh enable msg to the slave device
+Param_in            : uint8_t num
+Param_out           : 
+Return Type         : uint8_t flag
+Note                : before used, run AT_Get_State() first
+Author              : Yan
+Time                : 2021-01-19
+*************************************************************/
+uint8_t BLE_FINISH_MESH(uint8_t num);
 /*************************************************************
 Function Name       : ble_lock
 Function Description: used to send lock or unlock cmd

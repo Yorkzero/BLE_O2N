@@ -20,6 +20,7 @@ Date     : 2020-11-20
 const uint8_t beep_period_buf[E_BEEP_PERIOD_END] = {1, 2, 5, 6, 12, 63, 124, 250};
 uint8_t USART1_RX_buf[USART1_RX_MAX_LEN];//USART1 receive buffer
 uint8_t USART1_STA_buf[USART1_STA_MAX_LEN];//USART1 state buffer
+
 /*------------------ Variable Declarations -----------------*/
 volatile uint8_t key_flag = 0;       //key state flag
 volatile uint32_t beep_play_time = 0; //record the beep play time
@@ -28,7 +29,8 @@ volatile uint32_t beep_play_time = 0; //record the beep play time
  * @param bit [15] 0: waiting for receive, 1: received a set of data
  * @param bit [14:0] record the length of data
  */
-volatile uint16_t USART1_RX_STA = 0; 
+volatile uint16_t USART1_RX_STA = 0;
+ 
 /*------------------- Function Prototype -------------------*/
 
 /*------------------- Function Implement -------------------*/
@@ -126,7 +128,8 @@ void bsp_key_detec(void)
     if (30 > key_flag)//short press
     {
 #if(RELAY_DEV == DEVICE_ID)
-        
+    //    BLE_Init(); 
+        BLE_MESH();
 #else
     
 #endif
@@ -134,7 +137,7 @@ void bsp_key_detec(void)
     }
     if (30 <= key_flag)//long press
     {
-    
+        
     }
     key_flag = 0;
 }
@@ -448,7 +451,8 @@ void bsp_uart_init(void)
     ITC_SetSoftwarePriority(USART1_RX_IRQn, ITC_PriorityLevel_2);//priority 2
     USART_Cmd(USART1, ENABLE);
     USART1_RX_STA = 0;
-    bsp_tim3_init(1250);//Enter interrupt after 10ms
+    // bsp_tim3_init(1250);//Enter interrupt after 10ms
+    bsp_tim3_init(500);//Enter interrupt after 4ms
 }
 /*************************************************************
 Function Name       : USART1_IRQHandler
@@ -615,11 +619,12 @@ void node_info_query(void)
     data_packet_process(node_info_string);
     free(node_info_string);//release the rom
     node_info_string = NULL;
+    
 }
 /*************************************************************
 Function Name       : scan_packet_process
 Function Description: used to process scan packet
-Param_in            : uint16_t scan_cnt(10~30ms per scan)
+Param_in            : uint16_t scan_cnt(1~50ms per scan)
 Param_out           : 
 Return Type         : uint8_t flag
 Note                : the num of the slave device(x=0, 1, 2, 3)
@@ -632,482 +637,150 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
     uint8_t t;
     uint8_t head_ptr = 0;
     /**
-     * value    |   feature                 |   dir
-     * 0        |   head and tail           |   0->0 0->1
-     * 1        |   head and non-tail       |   1->2 1->3
-     * 2        |   non-head and tail       |   2->0 2->1
-     * 3        |   non-head and non-tail   |   3->2 3->3
+     * value    |   feature             |   dir
+     * 0        |   with tail           |   0->0 0->1
+     * 1        |   with non-tail       |   1->0 1->1
      **/
     uint8_t packet_sta = 0;//used to characterize the data status of the last cycle
     uint16_t retry = scan_cnt;
-    uint8_t *mac_addr = (uint8_t *)malloc(19);
-    uint8_t *mac_addr_m = (uint8_t *)malloc(41);
-    mac_addr[18] = '\n';
-    mac_addr[17] = '\r';
+    uint8_t *rx_buf_ptr = USART1_RX_buf;
+    uint8_t *sta_buf_ptr =USART1_STA_buf;
+    uint8_t *mac_addr = (uint8_t *)malloc(57);
+    for (uint8_t i = 0; i < 3; i++)
+    {        
+        mac_addr[18] = '\n';
+        mac_addr[17] = '\r';
+    }
+    
+    USART1_RX_STA = 0;
+    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+    AT_Send("AT+S_NAME=1,1\r\n");
     while (retry--)
     {
-        if (3 == flag)
+        if (2 == flag)
             break;
-        
-        delay_ms_1(10);
-        for (t = 0; t < 10; t++)//20 ms redundancy
+        for (t = 0; t < 50; t++)//50 ms redundancy
         {
             if(USART1_RX_STA & 0x8000)
                 break;
-            delay_ms_1(2);
+            delay_ms_1(1);
         }
         if ((USART1_RX_STA & 0x8000))//receive the data
         {
             t = USART1_RX_STA & 0x7FFF;//get the length of data
-            USART1_RX_STA = 0;//clear the state flag
+            USART1_RX_STA = 0;
+            uint8_t cur_cnt = 0;//record current count
+            uint8_t last_cnt = 0;//record last count
             switch (packet_sta)
             {
             case 0:
-            {   if ('\n' == USART1_RX_buf[t-1])// 0->0
+            {   
+                if ('\n' == USART1_RX_buf[t-1])// 0->0
                 {
 
                 }
                 else//0->1
                 {
                     packet_sta = 1;
-                    for (uint8_t i = 1; '\n' != USART1_RX_buf[t-i]; i++)
+                    for (uint8_t i = 1; i <= t; i++)
                     {
                         USART1_STA_buf[i-1] = USART1_RX_buf[t-i];
                         head_ptr += 1;
+                        if (('M' == USART1_RX_buf[t-i]) && ('A' == USART1_RX_buf[t-i+1]) && ('C' == USART1_RX_buf[t-i+2]))
+                            break;
                     }
-
+                    Reverse(USART1_STA_buf, head_ptr);
                 }
-                uint8_t cur_cnt = 0;//record current count
-                uint8_t last_cnt = 0;//record last count
-                while (t > cur_cnt)
-                {
-                    if ('\n' == USART1_RX_buf[cur_cnt])
-                    {
-                        if (42 < (cur_cnt - last_cnt))
-                        {
-                            //do nothing
-                        }
-                        else if ((':' == USART1_RX_buf[cur_cnt -6]) &&
-                                ('1' == USART1_RX_buf[cur_cnt - 5]) &&
-                                ('2' == USART1_RX_buf[cur_cnt - 4]) &&
-                                ('3' == USART1_RX_buf[cur_cnt - 3]) &&
-                                ('4' == USART1_RX_buf[cur_cnt - 2]))
-                        { 
-                            
-                            last_cnt += 4;
-                            for (uint8_t i = 0; i < 17; i++)
-                            {
-                                mac_addr[i] = USART1_RX_buf[last_cnt];
-                                last_cnt++;
-                            }
-                            AT_Send("AT+OBSERVER=0\r\n");                                
-                            if (0 == AT_Send((uint8_t *)(connect2("AT+CONNECT=,", mac_addr))))
-                            {
-                                AT_Send("AT+TTM_ROLE=1\r\n");
-                                AT_Send("AT+EXIT\r\n");
-                                USART1_SendWord("m");
-                                uint8_t j = 0;
-                                while (('s' != USART1_RX_buf[0]) && (100 > j))
-                                {
-                                    delay_ms_1(10);
-                                    j++;                                        
-                                }
-                                if (100 > j)//add a new device to the list
-                                    flag += 1;
-                                AT_Send("+++");
-                                AT_Send("AT+DISCONNECT\r\n");
-                                delay_ms_1(1000);
-                                USART1_RX_STA = 0;
-                                memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-                                AT_Send("AT+OBSERVER=1\r\n");
-                                packet_sta = 0;
-                                break;                                                        
-                            }
-                            else
-                            {
-                                AT_Send("AT+OBSERVER=1\r\n");
-                                packet_sta = 0;
-                                break;
-                            }
-                        }
-                        last_cnt = cur_cnt + 1;//set last_cnt to the next 'M'
-                    }
-                    
-                    cur_cnt++;
-                }
-            }                                                            
-                break;
-            case 1:
-            {   uint8_t cur_cnt = 0;//record current count
-                uint8_t last_cnt = 0;//record last count
-                while (t > cur_cnt) 
-                {
-                    if ('\n' == USART1_RX_buf[cur_cnt])
-                        break;
-                    cur_cnt++;
-                }
-                uint8_t i = 0;
-                while ((0 != head_ptr) && (40 >= i))
-                {
-                    mac_addr_m[i++] = USART1_STA_buf[head_ptr-1];
-                    head_ptr--;
-                }
-                memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-                uint8_t j = 0;
-                while ((j <= cur_cnt) && (40 >= i))    
-                {
-                    mac_addr_m[i++] = USART1_RX_buf[j++];                        
-                }
-                if (('\n' == mac_addr_m[40]) &&
-                    ('4' == mac_addr_m[38]) &&
-                    ('3' == mac_addr_m[37]) &&
-                    ('2' == mac_addr_m[36]) &&
-                    ('1' == mac_addr_m[35]) &&
-                    (':' == mac_addr_m[34]))
-                {
-                    last_cnt += 4;
-                    for (uint8_t i = 0; i < 17; i++)
-                        {
-                            
-                            mac_addr[i] = mac_addr_m[last_cnt];
-                            last_cnt++;
-                        }
-                    
-                    AT_Send("AT+OBSERVER=0\r\n");                                
-                    if (0 == AT_Send((uint8_t *)(connect2("AT+CONNECT=,", mac_addr))))
-                    {
-                        AT_Send("AT+TTM_ROLE=1\r\n");
-                        AT_Send("AT+EXIT\r\n");
-                        USART1_SendWord("m");
-                        uint8_t j = 0;
-                        while (('s' != USART1_RX_buf[0]) && (100 > j))
-                        {
-                            delay_ms_1(10);
-                            j++;                                        
-                        }
-                        if (100 > j)//add a new device to the list
-                            flag += 1;
-                        AT_Send("+++");
-                        AT_Send("AT+DISCONNECT\r\n");
-                        delay_ms_1(1000);
-                        USART1_RX_STA = 0;
-                        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-                        AT_Send("AT+OBSERVER=1\r\n");
-                        packet_sta = 0;
-                        break;                                                        
-                    }
-                    else
-                    {
-                        AT_Send("AT+OBSERVER=1\r\n");
-                        packet_sta = 0;
-                        break;
-                    }
-                }
-                cur_cnt++;
-                last_cnt = cur_cnt;
-                memset(mac_addr_m, 0, sizeof(mac_addr_m));
-                memset(mac_addr, 0, sizeof(mac_addr));
-                if ('\n' == USART1_RX_buf[t-1])// 1->2
-                {
-                    packet_sta = 2;                   
-                }
-                else//1->3
-                {
-                    packet_sta = 3;
-                    for (uint8_t i = 1; '\n' != USART1_RX_buf[t-i]; i++)
-                    {
-                        USART1_STA_buf[i-1] = USART1_RX_buf[t-i];
-                        head_ptr += 1;
-                    }
-                }
-                
-                while (t > cur_cnt)
-                {
-                    if ('\n' == USART1_RX_buf[cur_cnt])
-                    {
-                        if (42 < (cur_cnt - last_cnt))
-                        {
-                            //do nothing
-                        }
-                        else if ((':' == USART1_RX_buf[cur_cnt -6]) &&
-                                ('1' == USART1_RX_buf[cur_cnt - 5]) &&
-                                ('2' == USART1_RX_buf[cur_cnt - 4]) &&
-                                ('3' == USART1_RX_buf[cur_cnt - 3]) &&
-                                ('4' == USART1_RX_buf[cur_cnt - 2]))
-                        { 
-                            
-                            last_cnt += 4;
-                            for (uint8_t i = 0; i < 17; i++)
-                            {
-                                mac_addr[i] = USART1_RX_buf[last_cnt];
-                                last_cnt++;
-                            }
-                            AT_Send("AT+OBSERVER=0\r\n");                                
-                            if (0 == AT_Send((uint8_t *)(connect2("AT+CONNECT=,", mac_addr))))
-                            {
-                                AT_Send("AT+TTM_ROLE=1\r\n");
-                                AT_Send("AT+EXIT\r\n");
-                                USART1_SendWord("m");
-                                uint8_t j = 0;
-                                while (('s' != USART1_RX_buf[0]) && (100 > j))
-                                {
-                                    delay_ms_1(10);
-                                    j++;                                        
-                                }
-                                if (100 > j)//add a new device to the list
-                                    flag += 1;
-                                AT_Send("+++");
-                                AT_Send("AT+DISCONNECT\r\n");
-                                delay_ms_1(1000);
-                                USART1_RX_STA = 0;
-                                memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-                                AT_Send("AT+OBSERVER=1\r\n");
-                                packet_sta = 0;
-                                break;                                                        
-                            }
-                            else
-                            {
-                                AT_Send("AT+OBSERVER=1\r\n");
-                                packet_sta = 0;
-                                break;
-                            }
-                        }
-                        last_cnt = cur_cnt + 1;//set last_cnt to the next 'M'
-                    }
-                    
-                    cur_cnt++;
-                }
-            }                  
-                break;
-            case 2:
-            {   if ('\n' == USART1_RX_buf[t-1])// 2->0
-                {
-                    packet_sta = 0;                   
-                }
-                else//2->1
-                {
-                    packet_sta = 1;
-                    for (uint8_t i = 1; '\n' != USART1_RX_buf[t-i]; i++)
-                    {
-                        USART1_STA_buf[i-1] = USART1_RX_buf[t-i];
-                        head_ptr += 1;
-                    }
-                }
-                uint8_t cur_cnt = 0;//record current count
-                uint8_t last_cnt = 0;//record last count
-                while (t > cur_cnt)
-                {
-                    if ('\n' == USART1_RX_buf[cur_cnt])
-                    {
-                        if (42 < (cur_cnt - last_cnt))
-                        {
-                            //do nothing
-                        }
-                        else if ((':' == USART1_RX_buf[cur_cnt -6]) &&
-                                ('1' == USART1_RX_buf[cur_cnt - 5]) &&
-                                ('2' == USART1_RX_buf[cur_cnt - 4]) &&
-                                ('3' == USART1_RX_buf[cur_cnt - 3]) &&
-                                ('4' == USART1_RX_buf[cur_cnt - 2]))
-                        { 
-                            
-                            last_cnt += 4;
-                            for (uint8_t i = 0; i < 17; i++)
-                            {
-                                mac_addr[i] = USART1_RX_buf[last_cnt];
-                                last_cnt++;
-                            }
-                            AT_Send("AT+OBSERVER=0\r\n");                                
-                            if (0 == AT_Send((uint8_t *)(connect2("AT+CONNECT=,", mac_addr))))
-                            {
-                                AT_Send("AT+TTM_ROLE=1\r\n");
-                                AT_Send("AT+EXIT\r\n");
-                                USART1_SendWord("m");
-                                uint8_t j = 0;
-                                while (('s' != USART1_RX_buf[0]) && (100 > j))
-                                {
-                                    delay_ms_1(10);
-                                    j++;                                        
-                                }
-                                if (100 > j)//add a new device to the list
-                                    flag += 1;
-                                AT_Send("+++");
-                                AT_Send("AT+DISCONNECT\r\n");
-                                delay_ms_1(1000);
-                                USART1_RX_STA = 0;
-                                memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-                                AT_Send("AT+OBSERVER=1\r\n");
-                                packet_sta = 0;
-                                break;                                                        
-                            }
-                            else
-                            {
-                                AT_Send("AT+OBSERVER=1\r\n");
-                                packet_sta = 0;
-                                break;
-                            }
-                        }
-                        last_cnt = cur_cnt + 1;//set last_cnt to the next 'M'
-                    }
-                    
-                    cur_cnt++;
-                }                                         
             }
                 break;
-            case 3:
-            {   uint8_t cur_cnt = 0;//record current count
-                uint8_t last_cnt = 0;//record last count
-                while (t > cur_cnt) 
+            case 1:
+            {
+                for (uint8_t i = 0; ; i++)
                 {
-                    if ('\n' == USART1_RX_buf[cur_cnt])
+                    USART1_STA_buf[head_ptr+i] = USART1_RX_buf[i];
+                    cur_cnt = i + 1;
+                    if ('\n' == USART1_RX_buf[i])
                         break;
-                    cur_cnt++;
                 }
-                uint8_t i = 0;
-                while ((0 != head_ptr) && (40 >= i))
+                
+                if ('\n' == USART1_RX_buf[t-1])// 1->0
                 {
-                    mac_addr_m[i++] = USART1_STA_buf[head_ptr-1];
-                    head_ptr--;
+                    packet_sta = 0;
                 }
-                memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-                uint8_t j = 0;
-                while ((j <= cur_cnt) && (40 >= i))    
+                else//1->1
                 {
-                    mac_addr_m[i++] = USART1_RX_buf[j++];                        
-                }
-                if (('\n' == mac_addr_m[40]) &&
-                    ('4' == mac_addr_m[38]) &&
-                    ('3' == mac_addr_m[37]) &&
-                    ('2' == mac_addr_m[36]) &&
-                    ('1' == mac_addr_m[35]) &&
-                    (':' == mac_addr_m[34]))
-                {
-                    last_cnt += 4;
-                    for (uint8_t i = 0; i < 17; i++)
-                        {
-                            
-                            mac_addr[i] = mac_addr_m[last_cnt];
-                            last_cnt++;
-                        }
-                    
-                    AT_Send("AT+OBSERVER=0\r\n");                                
-                    if (0 == AT_Send((uint8_t *)(connect2("AT+CONNECT=,", mac_addr))))
-                    {
-                        AT_Send("AT+TTM_ROLE=1\r\n");
-                        AT_Send("AT+EXIT\r\n");
-                        USART1_SendWord("m");
-                        uint8_t j = 0;
-                        while (('s' != USART1_RX_buf[0]) && (100 > j))
-                        {
-                            delay_ms_1(10);
-                            j++;                                        
-                        }
-                        if (100 > j)//add a new device to the list
-                            flag += 1;
-                        AT_Send("+++");
-                        AT_Send("AT+DISCONNECT\r\n");
-                        delay_ms_1(1000);
-                        USART1_RX_STA = 0;
-                        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-                        AT_Send("AT+OBSERVER=1\r\n");
-                        packet_sta = 0;
-                        break;                                                        
-                    }
-                    else
-                    {
-                        AT_Send("AT+OBSERVER=1\r\n");
-                        packet_sta = 0;
-                        break;
-                    }
-                }
-                cur_cnt++;
-                last_cnt = cur_cnt;
-                memset(mac_addr_m, 0, sizeof(mac_addr_m));
-                memset(mac_addr, 0, sizeof(mac_addr));
-                if ('\n' == USART1_RX_buf[t-1])// 3->2
-                {
-                    packet_sta = 2;                   
-                }
-                else// 3->3
-                {
-                    for (uint8_t i = 1; '\n' != USART1_RX_buf[t-i]; i++)
+                    packet_sta = 1;
+                    for (uint8_t i = 1; i <= t; i++)
                     {
                         USART1_STA_buf[i-1] = USART1_RX_buf[t-i];
                         head_ptr += 1;
+                        if (('M' == USART1_RX_buf[t-i]) && ('A' == USART1_RX_buf[t-i+1]) && ('C' == USART1_RX_buf[t-i+2]))
+                            break;
                     }
+                    Reverse(USART1_STA_buf, head_ptr);
                 }
-                while (t > cur_cnt)
-                {
-                    if ('\n' == USART1_RX_buf[cur_cnt])
-                    {
-                        if (42 < (cur_cnt - last_cnt))
-                        {
-                            //do nothing
-                        }
-                        else if ((':' == USART1_RX_buf[cur_cnt -6]) &&
-                                ('1' == USART1_RX_buf[cur_cnt - 5]) &&
-                                ('2' == USART1_RX_buf[cur_cnt - 4]) &&
-                                ('3' == USART1_RX_buf[cur_cnt - 3]) &&
-                                ('4' == USART1_RX_buf[cur_cnt - 2]))
-                        { 
-                            
-                            last_cnt += 4;
-                            for (uint8_t i = 0; i < 17; i++)
-                            {
-                                mac_addr[i] = USART1_RX_buf[last_cnt];
-                                last_cnt++;
-                            }
-                            AT_Send("AT+OBSERVER=0\r\n");                                
-                            if (0 == AT_Send((uint8_t *)(connect2("AT+CONNECT=,", mac_addr))))
-                            {
-                                AT_Send("AT+TTM_ROLE=1\r\n");
-                                AT_Send("AT+EXIT\r\n");
-                                USART1_SendWord("m");
-                                uint8_t j = 0;
-                                while (('s' != USART1_RX_buf[0]) && (100 > j))
-                                {
-                                    delay_ms_1(10);
-                                    j++;                                        
-                                }
-                                if (100 > j)//add a new device to the list
-                                    flag += 1;
-                                AT_Send("+++");
-                                AT_Send("AT+DISCONNECT\r\n");
-                                delay_ms_1(1000);
-                                USART1_RX_STA = 0;
-                                memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-                                AT_Send("AT+OBSERVER=1\r\n");
-                                packet_sta = 0;
-                                break;                                                        
-                            }
-                            else
-                            {
-                                AT_Send("AT+OBSERVER=1\r\n");
-                                packet_sta = 0;
-                                break;
-                            }
-                        }
-                        last_cnt = cur_cnt + 1;//set last_cnt to the next 'M'
-                    }
-                    
-                    cur_cnt++;
-                }                  
             }
                 break;
             default:
                 break;
             }
-            
+            if (packet_sta)
+            {
+                if (('_' == USART1_STA_buf[head_ptr+cur_cnt-7]) &&
+                    ('R' == USART1_STA_buf[head_ptr+cur_cnt-13]))
+                {
+                    last_cnt += 4;
+                    for (uint8_t i = 0; i < 17; i++)
+                    {
+                        mac_addr[i] = USART1_STA_buf[last_cnt];
+                        last_cnt++;
+                    }
+                    flag += 1;
+                    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+                    
+                }
+                last_cnt = cur_cnt;    
+            }
+            while ((t-head_ptr) > cur_cnt)
+            {
+                if ('\n' == USART1_RX_buf[cur_cnt])
+                {
+                    
+                    if (('_' == USART1_RX_buf[cur_cnt-6]) &&
+                        ('R' == USART1_RX_buf[cur_cnt-12]))
+                    {
+                        last_cnt += 4;
+                        for (uint8_t i = 0; i < 17; i++)
+                        {
+                            mac_addr[i] = USART1_RX_buf[last_cnt];
+                            last_cnt++;
+                        }
+                        flag += 1;
+                    }
+                    if (t == (cur_cnt + 1))//the end
+                    {
+                        break;
+                    }
+                last_cnt = cur_cnt + 1;
+                }
+                cur_cnt++;
+            }
+            head_ptr = 0;
+            //clear the rx buffer
+            memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+
         }
+        USART1_RX_STA = 0;
+        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     }
     //clear the rx buffer
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-    memset(mac_addr, 0, sizeof(mac_addr));
-    memset(mac_addr_m, 0, sizeof(mac_addr_m));
-    free(mac_addr_m);
-    free(mac_addr);
+    AT_Send("AT+EXIT\r\n");
     return flag;
+    
 }
 /**
  * 模拟串口打印输出调试信息

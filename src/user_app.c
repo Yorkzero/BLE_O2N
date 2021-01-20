@@ -60,12 +60,12 @@ uint8_t AT_Send(uint8_t *atcmd)
     while (retry--)
     {
         USART1_SendWord(atcmd);
-        delay_ms_1(10);
+        delay_ms_1(5);
         for (t = 0; t < 10; t++)
         {
             if(USART1_RX_STA & 0x8000)
                 break;
-            delay_ms_1(5);
+            delay_ms_1(1);
         }
         if ((USART1_RX_STA & 0x8000))//receive the data
         {
@@ -145,7 +145,7 @@ uint8_t AT_Get_State(char *sta)
     if(!tag && (0 != retry))
     {
         uint16_t i = 0;  
-        for (t = 6 + stalen; t < (temp - 6); t++)
+        for (t = 6 + stalen; t < (temp - 5); t++)
         {   //storage the relevant data in the buffer, empty it when access.   
             USART1_STA_buf[i] = USART1_RX_buf[t];
             i++;
@@ -222,6 +222,10 @@ Return Type         :
 Note                : 
 Author              : Yan
 Time                : 2020-12-04
+--------------------------------------------------------------
+log:
+data:  2021-1-19
+note:  use this to display the mesh
 *************************************************************/
 void BLE_status_run(void)
 {
@@ -281,15 +285,67 @@ Time                : 2021-01-15
 *************************************************************/
 uint8_t BLE_MESH(void)
 {
-    if (0 == myflag.BLE_STA_flag)//non-mesh
+    if (0 == myflag.BLE_STA_flag)//meshed
         return 0;
     uint8_t flag = 1;
     AT_Send("+++");//enter AT mode
-    AT_Send("AT+OBSERVER=1\r\n");//enter scan mode
-    uint8_t num = scan_packet_process(100);
-    AT_Get_State("DEV_DEL");
-    
-
+    uint8_t num = scan_packet_process(200);
+    AT_Get_State("DEV_DEL");//storage the mac address into the sta buf
+    if (1 == BLE_FINISH_MESH(num))//success
+    {
+        myflag.BLE_STA_flag = 0;
+        flag = 0;
+    }
+    else
+    {
+        myflag.BLE_STA_flag = 1;
+        flag = 1;
+    }
+    return flag;
+}
+/*************************************************************
+Function Name       : BLE_FINISH_MESH
+Function Description: finish mesh and send mesh enable msg to the slave device
+Param_in            : uint8_t num
+Param_out           : 
+Return Type         : uint8_t flag
+Note                : before used, run AT_Get_State() first
+Author              : Yan
+Time                : 2021-01-19
+*************************************************************/
+uint8_t BLE_FINISH_MESH(uint8_t num)
+{
+    uint8_t *mac_addr = (uint8_t *)malloc(19);
+    uint8_t sta_ptr = 0;
+    uint8_t flag = 1;
+    while (num--)
+    {
+        for (uint8_t i = 0; i<19; i++)
+        {
+            mac_addr[i] = USART1_STA_buf[sta_ptr++];
+        }
+        AT_Send((uint8_t *)(connect2("AT+CONNECT=,", mac_addr)));
+        AT_Send("AT+TTM_ROLE=1\r\n");
+        AT_Send("AT+EXIT\r\n");
+        USART1_SendWord("f");
+        uint8_t j = 0;
+        while (('s' != USART1_RX_buf[0]) && (100 > j))
+        {
+            delay_ms_1(10);
+            j++;                                        
+        }
+        if(100 == j)//outtime
+        {
+            flag = 0;
+            return flag;            
+        }
+        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+        AT_Send("+++");
+        AT_Send("AT+DISCONNECT\r\n");
+    }
+    memset(mac_addr, 0, sizeof(mac_addr));
+    free(mac_addr);
+    return flag;
 }
 
 /*************************************************************

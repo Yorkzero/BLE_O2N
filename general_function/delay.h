@@ -96,6 +96,8 @@ extern void delay_ms_2(uint16_t n);
 // extern char *Connect(char* str1, char* str2, char* p);
 extern char *connect2(char *a, char *b);
 extern char *connect3(char *a, char *b, char *d);
+extern uint8_t strStr(uint8_t* haystack, uint8_t* needle);
+extern void Reverse(uint8_t *p , uint8_t size);
 #if 1
 //系统时钟1M时，指令周期为1us
 #if (SYS_CLK_FREQ == SYS_CLK_FREQ_1M)
