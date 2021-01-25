@@ -24,8 +24,7 @@ volatile myFlag myflag = {
                             1,  //LOCK state flag 0:LOCKED, 1:UNLOCKED
                             1,  //system state flag 0:halt, 1:run
                             0,  //initialization state flag 0:not initialized yet, 1:initialized ready
-                            0,  //unused
-                            0,  //unused
+                            0,  //used to record the number of bound mac addresses, x=0, 1, 2, 3
                             0,  //unused
                             0,  //unused
                          }; 
@@ -59,9 +58,12 @@ uint8_t AT_Send(uint8_t *atcmd)
     uint8_t retry = 10;//number of AT command sending attempts
     while (retry--)
     {
-        USART1_SendWord(atcmd);
-        delay_ms_1(5);
-        for (t = 0; t < 10; t++)
+        if (0 == BLE_CTS_READ())
+        {
+            USART1_SendWord(atcmd);
+            delay_ms_1(2);
+        }
+        for (t = 0; t < 60; t++)
         {
             if(USART1_RX_STA & 0x8000)
                 break;
@@ -145,7 +147,7 @@ uint8_t AT_Get_State(char *sta)
     if(!tag && (0 != retry))
     {
         uint16_t i = 0;  
-        for (t = 6 + stalen; t < (temp - 5); t++)
+        for (t = 4 + stalen; t < (temp - 4); t++)
         {   //storage the relevant data in the buffer, empty it when access.   
             USART1_STA_buf[i] = USART1_RX_buf[t];
             i++;
@@ -155,6 +157,38 @@ uint8_t AT_Get_State(char *sta)
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     if(0 == retry)tag = 1;//enter failed
     return tag;
+}
+/*************************************************************
+Function Name       : BLE_Name_Change
+Function Description: change device name to notify that mesh finished
+Param_in            : ENABLE or DISABLE
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-25
+*************************************************************/
+void BLE_Name_Change(FunctionalState Newstate)
+{
+    AT_Send("+++");
+    assert_param(IS_FUNCTIONAL_STATE(Newstate));
+    if ((ENABLE == Newstate) && (myflag.BLE_STA_flag))
+    {
+        AT_Get_State("NAME");
+        uint8_t *sta_ptr = USART1_STA_buf;
+        USART1_STA_buf[0] = 'r';
+        AT_Send((uint8_t *)(connect2("AT+NAME=", sta_ptr)));
+        myflag.BLE_STA_flag = 0;
+    }
+    if ((DISABLE == Newstate) && (!myflag.BLE_STA_flag))
+    {
+        AT_Get_State("NAME");
+        uint8_t *sta_ptr = USART1_STA_buf;
+        USART1_STA_buf[0] = 'R';
+        AT_Send((uint8_t *)(connect2("AT+NAME=", sta_ptr)));
+        myflag.BLE_STA_flag = 1;
+    }
+    AT_Send("AT+EXIT\r\n");
 }
 /*************************************************************
 Function Name       : BLE_status_it
@@ -265,10 +299,10 @@ void BLE_Init(void)
         return;
     AT_Send("+++");//enter AT mode
     AT_Send("AT+ROLE=2\r\n");//set the role: slave and master
-    AT_Send("AT+POWER=-30\r\n");//set the TX power as -30db
+    AT_Send("AT+POWER=-10\r\n");//set the TX power as -30db
+    AT_Send("AT+PACK=200,5\r\n");//set the pack range and frame as 200byte and 5ms outtime
     AT_Send("AT+CNT_INTERVAL=24\r\n");//set the connect interval as (24 * 1.25 = 30)ms
-    AT_Send("AT+ADS=1,1,1000\r\n");//set the advertise interval as 1000ms
-    AT_Send("AT+ADV_DATA=1,1234\r\n");//set the advertisement data: 1234
+    AT_Send("AT+ADS=1,1,50\r\n");//set the advertise interval as 50ms
     AT_Send("AT+RESTART\r\n");//restart the device
     AT_Send("AT+EXIT\r\n");
     myflag.INIT_STA_flag = 1;//init ok
@@ -289,8 +323,7 @@ uint8_t BLE_MESH(void)
         return 0;
     uint8_t flag = 1;
     AT_Send("+++");//enter AT mode
-    uint8_t num = scan_packet_process(200);
-    AT_Get_State("DEV_DEL");//storage the mac address into the sta buf
+    uint8_t num = scan_packet_process(100);
     if (1 == BLE_FINISH_MESH(num))//success
     {
         myflag.BLE_STA_flag = 0;

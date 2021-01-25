@@ -23,10 +23,9 @@ typedef struct sysFlag
   uint8_t LOCK_STA_flag:1;//LOCK state flag 0:LOCKED, 1:UNLOCKED
   uint8_t SYS_STA_flag:1;//system state flag 0:halt, 1:run
   uint8_t INIT_STA_flag:1;//initialization state flag 0:not initialized yet, 1:initialized ready
-  uint8_t e:1;//unused
+  uint8_t MAC_NUM_flag:2;//used to record the number of bound mac addresses, x=0, 1, 2, 3
   uint8_t f:1;//unused
   uint8_t g:1;//unused
-  uint8_t h:1;//unused
 }myFlag;
 extern volatile myFlag myflag;
 #if (RELAY_DEV == DEVICE_ID)
@@ -64,6 +63,17 @@ Author              : Yan
 Time                : 2020-11-27
 *************************************************************/
 uint8_t AT_Get_State(char *sta);
+/*************************************************************
+Function Name       : BLE_Name_Change
+Function Description: change device name to notify that mesh finished
+Param_in            : ENABLE or DISABLE
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-25
+*************************************************************/
+void BLE_Name_Change(FunctionalState Newstate);
 /*************************************************************
 Function Name       : BLE_status_it
 Function Description: Use peripherals to express BLE status

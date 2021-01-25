@@ -18,6 +18,7 @@ Date     : 2020-11-20
 
 /*-------------------- Type Declarations -------------------*/
 const uint8_t beep_period_buf[E_BEEP_PERIOD_END] = {1, 2, 5, 6, 12, 63, 124, 250};
+uint8_t MAC_ADDR[MAC_ADDR_MSG];//mac address
 uint8_t USART1_RX_buf[USART1_RX_MAX_LEN];//USART1 receive buffer
 uint8_t USART1_STA_buf[USART1_STA_MAX_LEN];//USART1 state buffer
 
@@ -52,7 +53,7 @@ void bsp_gpio_init(void)
     GPIO_Init(LEDR_PORT, LEDR_PIN, GPIO_Mode_Out_PP_Low_Slow);        //Red led init
     GPIO_Init(LOWV_PORT, LOWV_PIN, GPIO_Mode_In_FL_No_IT);            //Low pwr detection, opening interrupt when used.
     GPIO_Init(KEY_PORT, KEY_PIN, GPIO_Mode_In_PU_No_IT);              //key detection, opening interrupt when used.
-    GPIO_Init(BLE_RESET_PORT, BLE_RESET_PIN, GPIO_Mode_Out_PP_High_Slow); //ble chip enable state/active low
+    GPIO_Init(BLE_CTS_PORT, BLE_CTS_PIN, GPIO_Mode_In_PU_No_IT);        //ble CTS state/active low
     GPIO_Init(BLE_RTS_PORT, BLE_RTS_PIN, GPIO_Mode_Out_PP_High_Slow);    //ble RTS state/active low
     GPIO_Init(BEEP_PORT, BEEP_PIN, GPIO_Mode_Out_PP_Low_Slow);        //beep init
     GPIO_Init(UART_RX_PORT, UART_RX_PIN, GPIO_Mode_In_PU_No_IT);      //UART receive init
@@ -128,8 +129,11 @@ void bsp_key_detec(void)
     if (30 > key_flag)//short press
     {
 #if(RELAY_DEV == DEVICE_ID)
-    //    BLE_Init(); 
+        // USART1_RX_STA = 0;
+        // memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+        // AT_Send("+++");
         BLE_MESH();
+        // BLE_Init();
 #else
     
 #endif
@@ -137,7 +141,7 @@ void bsp_key_detec(void)
     }
     if (30 <= key_flag)//long press
     {
-        
+        BLE_Init();
     }
     key_flag = 0;
 }
@@ -636,6 +640,7 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
     uint8_t flag = 0;
     uint8_t t;
     uint8_t head_ptr = 0;
+    
     /**
      * value    |   feature             |   dir
      * 0        |   with tail           |   0->0 0->1
@@ -646,16 +651,12 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
     uint8_t *rx_buf_ptr = USART1_RX_buf;
     uint8_t *sta_buf_ptr =USART1_STA_buf;
     uint8_t *mac_addr = (uint8_t *)malloc(57);
-    for (uint8_t i = 0; i < 3; i++)
-    {        
-        mac_addr[18] = '\n';
-        mac_addr[17] = '\r';
-    }
     
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-    AT_Send("AT+S_NAME=1,1\r\n");
+    AT_Send("AT+S_NAME=0\r\n");
+    AT_Send("AT+S_NAME=1\r\n");
     while (retry--)
     {
         if (2 == flag)
@@ -774,6 +775,7 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
         USART1_RX_STA = 0;
         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     }
+    AT_Send("AT+S_NAME=0\r\n");
     //clear the rx buffer
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));

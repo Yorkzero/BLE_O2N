@@ -46,18 +46,13 @@ Date     : 2020-11-20
 #define KEY_DISABLE()   GPIO_Init(KEY_PORT, KEY_PIN, GPIO_Mode_In_PU_No_IT)//KEY NO IT
 #define KEY_READ()      (KEY_PORT->IDR & KEY_PIN)   //read the key value(active low)
 
-#define BLE_RESET_PORT      GPIOD      //ble reset
-#define BLE_RESET_PIN       GPIO_Pin_1 //ble reset
-#define BLE_STA_RESET()     BLE_RESET_PORT->ODR &= ~BLE_RESET_PIN
-#define BLE_STA_SET()       BLE_RESET_PORT->ODR |= BLE_RESET_PIN
+#define BLE_CTS_PORT        GPIOD      //ble cts port
+#define BLE_CTS_PIN         GPIO_Pin_1 //ble cts pin
+#define BLE_CTS_READ()      (BLE_CTS_PORT->IDR & BLE_CTS_PIN) //read the ble CTS state(active low)
 #define BLE_RTS_PORT        GPIOC      //ble rts port
 #define BLE_RTS_PIN         GPIO_Pin_4 //ble rts pin
 #define BLE_SEND_ENABLE()   BLE_RTS_PORT->ODR &= ~BLE_RTS_PIN
 #define BLE_SEND_DISABLE()  BLE_RTS_PORT->ODR |= BLE_RTS_PIN
-//#define EXTI_LINK_PIN   EXTI_Pin_4  //ble exti link pin
-#define LINK_ENABLE()   GPIO_Init(BLE_LINK_PORT, BLE_LINK_PIN, GPIO_Mode_In_PU_IT)     //LINK IT
-#define LINK_DISABLE()  GPIO_Init(BLE_LINK_PORT, BLE_LINK_PIN, GPIO_Mode_In_PU_NO_IT)  //LINK NO IT
-#define BLE_STA_READ()  (BLE_LINK_PORT->IDR & BLE_LINK_PIN) //read the state(active low)
 
 #define BEEP_PORT       GPIOB      //beep
 #define BEEP_PIN        GPIO_Pin_0 //beep
