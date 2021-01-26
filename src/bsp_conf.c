@@ -18,7 +18,6 @@ Date     : 2020-11-20
 
 /*-------------------- Type Declarations -------------------*/
 const uint8_t beep_period_buf[E_BEEP_PERIOD_END] = {1, 2, 5, 6, 12, 63, 124, 250};
-uint8_t MAC_ADDR[MAC_ADDR_MSG];//mac address
 uint8_t USART1_RX_buf[USART1_RX_MAX_LEN];//USART1 receive buffer
 uint8_t USART1_STA_buf[USART1_STA_MAX_LEN];//USART1 state buffer
 
@@ -637,29 +636,22 @@ Time                : 2021-01-15
 *************************************************************/
 uint8_t scan_packet_process(uint16_t scan_cnt)
 {
-    uint8_t flag = 0;
+    uint8_t flag = myflag.MAC_NUM_flag;
     uint8_t t;
-    uint8_t head_ptr = 0;
-    
-    /**
-     * value    |   feature             |   dir
-     * 0        |   with tail           |   0->0 0->1
-     * 1        |   with non-tail       |   1->0 1->1
-     **/
-    uint8_t packet_sta = 0;//used to characterize the data status of the last cycle
     uint16_t retry = scan_cnt;
-    uint8_t *rx_buf_ptr = USART1_RX_buf;
-    uint8_t *sta_buf_ptr =USART1_STA_buf;
-    uint8_t *mac_addr = (uint8_t *)malloc(57);
-    
+    uint8_t *rx_buf_ptr = USART1_RX_buf;//debug monitoring pointer
+    uint8_t *sta_buf_ptr =USART1_STA_buf;//debug monitoring pointer
+    uint8_t *mac_addr = (uint8_t *)malloc(19);
+    mac_addr[18] = '\n';
+    mac_addr[17] = '\r';
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-    AT_Send("AT+S_NAME=0\r\n");
-    AT_Send("AT+S_NAME=1\r\n");
+    AT_Send("AT+S_NAME=0\r\n");//stop scan
+    AT_Send("AT+S_NAME=1\r\n");//start scan
     while (retry--)
     {
-        if (2 == flag)
+        if (3 == flag)
             break;
         for (t = 0; t < 50; t++)//50 ms redundancy
         {
@@ -671,79 +663,21 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
         {
             t = USART1_RX_STA & 0x7FFF;//get the length of data
             USART1_RX_STA = 0;
+            if (200 == t)//buffer overflow
+            {
+                memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+                memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+                continue;
+            }
+            if ('M' != USART1_RX_buf[0])//message filtter
+            {
+                memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+                memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+                continue;
+            }
             uint8_t cur_cnt = 0;//record current count
             uint8_t last_cnt = 0;//record last count
-            switch (packet_sta)
-            {
-            case 0:
-            {   
-                if ('\n' == USART1_RX_buf[t-1])// 0->0
-                {
-
-                }
-                else//0->1
-                {
-                    packet_sta = 1;
-                    for (uint8_t i = 1; i <= t; i++)
-                    {
-                        USART1_STA_buf[i-1] = USART1_RX_buf[t-i];
-                        head_ptr += 1;
-                        if (('M' == USART1_RX_buf[t-i]) && ('A' == USART1_RX_buf[t-i+1]) && ('C' == USART1_RX_buf[t-i+2]))
-                            break;
-                    }
-                    Reverse(USART1_STA_buf, head_ptr);
-                }
-            }
-                break;
-            case 1:
-            {
-                for (uint8_t i = 0; ; i++)
-                {
-                    USART1_STA_buf[head_ptr+i] = USART1_RX_buf[i];
-                    cur_cnt = i + 1;
-                    if ('\n' == USART1_RX_buf[i])
-                        break;
-                }
-                
-                if ('\n' == USART1_RX_buf[t-1])// 1->0
-                {
-                    packet_sta = 0;
-                }
-                else//1->1
-                {
-                    packet_sta = 1;
-                    for (uint8_t i = 1; i <= t; i++)
-                    {
-                        USART1_STA_buf[i-1] = USART1_RX_buf[t-i];
-                        head_ptr += 1;
-                        if (('M' == USART1_RX_buf[t-i]) && ('A' == USART1_RX_buf[t-i+1]) && ('C' == USART1_RX_buf[t-i+2]))
-                            break;
-                    }
-                    Reverse(USART1_STA_buf, head_ptr);
-                }
-            }
-                break;
-            default:
-                break;
-            }
-            if (packet_sta)
-            {
-                if (('_' == USART1_STA_buf[head_ptr+cur_cnt-7]) &&
-                    ('R' == USART1_STA_buf[head_ptr+cur_cnt-13]))
-                {
-                    last_cnt += 4;
-                    for (uint8_t i = 0; i < 17; i++)
-                    {
-                        mac_addr[i] = USART1_STA_buf[last_cnt];
-                        last_cnt++;
-                    }
-                    flag += 1;
-                    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-                    
-                }
-                last_cnt = cur_cnt;    
-            }
-            while ((t-head_ptr) > cur_cnt)
+            while (t > cur_cnt)
             {
                 if ('\n' == USART1_RX_buf[cur_cnt])
                 {
@@ -757,20 +691,63 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
                             mac_addr[i] = USART1_RX_buf[last_cnt];
                             last_cnt++;
                         }
-                        flag += 1;
+                        AT_Send("AT+S_NAME=0\r\n");
+                        AT_Send((uint8_t *)(connect2("AT+CONNECT=,", mac_addr)));
+                        for (uint8_t i = 0; i < 100; i++)//delay 1s
+                        {
+                            delay_ms_1(10);
+                            if(USART1_RX_STA & 0x8000)
+                                break;
+                        }
+                        if ((USART1_RX_STA & 0x8000))
+                        {
+                            t = USART1_RX_STA & 0x7FFF;//get the length of data
+                            USART1_RX_STA = 0;
+                            if ('C' == USART1_RX_buf[t-6])//successfully connected
+                            {
+                                AT_Get_Cnt_List();
+                                uint8_t handler = strStr(sta_buf_ptr, mac_addr) - 3;
+                                uint8_t a[3];
+                                a[0] = USART1_STA_buf[handler];
+                                a[1] = '\r';
+                                a[2] = '\n';
+                                uint8_t *a_ptr = a;
+                                memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+                                AT_Send("AT+TTM_ROLE=1\r\n");
+                                AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a_ptr));
+                                AT_Send("AT+EXIT\r\n");//exit AT mode
+                                if (0 == (BLE_Send("pairing request")))
+                                {
+                                    flag += 1;
+                                    AT_Send("+++");
+                                    AT_Get_State("MAC");
+                                    AT_Send("AT+EXIT\r\n");
+                                    BLE_Send((uint8_t *)connect2("1 ", sta_buf_ptr));
+                                    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+                                    AT_Send("+++");
+                                    
+                                    AT_Send("AT+S_NAME=1\r\n");
+                                    break;
+                                }
+                                else
+                                {
+                                    AT_Send("+++");
+                                    AT_Send((uint8_t *)connect2("AT+DISCONNECT=2,", a_ptr));
+                                    AT_Send("AT+S_NAME=1\r\n");
+                                    break;
+                                }
+                            }
+                        }
+                        
                     }
                     if (t == (cur_cnt + 1))//the end
                     {
                         break;
                     }
-                last_cnt = cur_cnt + 1;
+                    last_cnt = cur_cnt + 1;
                 }
                 cur_cnt++;
             }
-            head_ptr = 0;
-            //clear the rx buffer
-            memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-
         }
         USART1_RX_STA = 0;
         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
@@ -781,8 +758,85 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
     AT_Send("AT+EXIT\r\n");
+    myflag.MAC_NUM_flag = flag;
     return flag;
     
+}
+/*************************************************************
+Function Name       : request_msg_process
+Function Description: used to deal with the request message after connected
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-26
+*************************************************************/
+void request_msg_process(void)
+{
+    
+    if ((USART1_RX_STA & 0x8000) && !myflag.LINK_STA_flag)//not linked yet
+    {
+        uint8_t t = USART1_RX_STA & 0x7fff;//get packet length
+        USART1_RX_STA = 0;
+        if (('S' == USART1_RX_buf[0]) && ('C' == USART1_RX_buf[2]))//be connected
+        {
+            myflag.LINK_STA_flag = 1;
+            
+        }
+        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    }
+    if ((USART1_RX_STA & 0x8000) && myflag.LINK_STA_flag)//get msg
+    {
+        uint8_t t = USART1_RX_STA & 0x7fff;//get packet length
+        USART1_RX_STA = 0;
+        if (('S' == USART1_RX_buf[0]) && ('D' == USART1_RX_buf[2]))//be disconnected
+        {
+            myflag.LINK_STA_flag = 0;//stop linked flag
+            uint8_t *sta_buf_ptr = USART1_STA_buf;
+            AT_Send("+++");
+            AT_Send((uint8_t *)connect2("AT+CONNECT=,", sta_buf_ptr));
+            for (uint8_t i = 0; i < 100; i++)//delay 1s
+            {
+                delay_ms_1(10);
+                if(USART1_RX_STA & 0x8000)
+                    break;
+            }
+            if ((USART1_RX_STA & 0x8000))
+            {
+                t = USART1_RX_STA & 0x7FFF;//get the length of data
+                USART1_RX_STA = 0;
+                if ('C' == USART1_RX_buf[t-6])//successfully connected
+                {
+                    myflag.MAC_NUM_flag += 1;
+                    AT_Send("AT+DISCONNECT\r\n");
+                    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+                    BLE_MESH();
+                }
+            }
+        }    
+        if (('p' == USART1_RX_buf[0]) && ('a' == USART1_RX_buf[1]))//be connected
+        {
+            BLE_Name_Change(ENABLE);
+            AT_Send("+++");
+            AT_Send("AT+TTM_ROLE=0\r\n");
+            AT_Send("AT+EXIT\r\n");
+            USART1_SendWord("y");
+        }
+        if (('1' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))//msg format：1 xx:xx:xx:xx:xx:xx\r\n
+        {
+            for (uint8_t i = 0; i < 19; i++)
+            {
+                USART1_STA_buf[i] = USART1_RX_buf[i+2];
+            }
+            USART1_SendWord("y");
+        }
+        else//invalid msg
+        {
+            USART1_SendWord("n");
+        }
+        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    }
 }
 /**
  * 模拟串口打印输出调试信息

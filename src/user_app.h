@@ -24,7 +24,7 @@ typedef struct sysFlag
   uint8_t SYS_STA_flag:1;//system state flag 0:halt, 1:run
   uint8_t INIT_STA_flag:1;//initialization state flag 0:not initialized yet, 1:initialized ready
   uint8_t MAC_NUM_flag:2;//used to record the number of bound mac addresses, x=0, 1, 2, 3
-  uint8_t f:1;//unused
+  uint8_t LINK_STA_flag:1;//used to enter status of msg exc 0:not ready, 1:ready
   uint8_t g:1;//unused
 }myFlag;
 extern volatile myFlag myflag;
@@ -49,6 +49,17 @@ Time                : 2020-11-27
 *************************************************************/
 uint8_t AT_Send(uint8_t *atcmd);
 /*************************************************************
+Function Name       : BLE_Send
+Function Description: send BLE cmd
+Param_in            : uint8_t *atcmd
+Param_out           : 
+Return Type         : u16 tag
+Note                : 0: succeed/1: failed
+Author              : Yan
+Time                : 2020-11-27
+*************************************************************/
+uint8_t BLE_Send(uint8_t *atcmd);
+/*************************************************************
 Function Name       : AT_Get_State
 Function Description: use AT to get BLE state
 Param_in            : char *sta
@@ -63,6 +74,17 @@ Author              : Yan
 Time                : 2020-11-27
 *************************************************************/
 uint8_t AT_Get_State(char *sta);
+/*************************************************************
+Function Name       : AT_Get_Cnt_List
+Function Description: get the connected device list
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-26
+*************************************************************/
+uint8_t AT_Get_Cnt_List(void);
 /*************************************************************
 Function Name       : BLE_Name_Change
 Function Description: change device name to notify that mesh finished

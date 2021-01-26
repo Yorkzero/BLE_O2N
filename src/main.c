@@ -53,7 +53,6 @@ int main(void)
     __enable_interrupt();
     //init buff
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-    memset(MAC_ADDR, 0, sizeof(MAC_ADDR));
     USART1_RX_STA = 0;
     BLE_SEND_ENABLE();
     delay_ms_1(100);
@@ -61,6 +60,8 @@ int main(void)
     while(1)
     {
         // halt();
+        BLE_status_run();
+        request_msg_process();
     }
 #endif
 }

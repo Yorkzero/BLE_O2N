@@ -18,14 +18,12 @@ Date     : 2020-11-20
 /*----------- Global Definitions and Declarations ----------*/
 //USART1相关宏定义
 #define USART1_RX_MAX_LEN      200  //最大接收缓存字节
-#define USART1_STA_MAX_LEN     50  //最大状态量缓存字节
-#define MAC_ADDR_MSG           80   //绑定设备信息
+#define USART1_STA_MAX_LEN     100  //最大状态量缓存字节
 extern volatile uint8_t key_flag;   //key state flag
 extern volatile uint32_t beep_play_time; //record the beep play time
 extern volatile uint16_t USART1_RX_STA;  //record the receive data
 extern uint8_t USART1_RX_buf[USART1_RX_MAX_LEN];//USART1 receive buffer
 extern uint8_t USART1_STA_buf[USART1_STA_MAX_LEN];//USART1 state buffer
-extern uint8_t MAC_ADDR[MAC_ADDR_MSG];//mac address
 /*-------------------- Type Declarations -------------------*/
 
 
@@ -244,6 +242,17 @@ Author              : Yan
 Time                : 2021-01-15
 *************************************************************/
 uint8_t scan_packet_process(uint16_t scan_cnt);
+/*************************************************************
+Function Name       : request_msg_process
+Function Description: used to deal with the request message after connected
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-26
+*************************************************************/
+void request_msg_process(void);
 //模拟串口打印
 #if (SIM_UART_PRINTF_EN)
 extern void sim_uart_printf(uint8_t data);

@@ -278,7 +278,7 @@ char *connect2(char *a, char *b) {
     char *c = (char *) malloc(strlen(a) + strlen(b) + 1); //'\0'结尾添加1
     if (c == NULL) exit (1);
     char *tempc;
-    char value[30] = "0";
+    char value[50] = "0";
     char *tempv;
     uint8_t t = 0;
     memset(c, 0, sizeof(c));
@@ -346,7 +346,7 @@ char *connect3(char *a, char *b, char *d) {
 }
 uint8_t strStr(uint8_t* haystack, uint8_t* needle) {
     uint8_t m=strlen(haystack);//计算两字符串长度
-    uint8_t n=strlen(needle);
+    uint8_t n=strlen(needle) - 2;//专用于地址寻找，修正2
     if(n==0) return 0;
     
     for(uint8_t i=0;i<m;i++){
@@ -361,7 +361,7 @@ uint8_t strStr(uint8_t* haystack, uint8_t* needle) {
             
         }
         if(j==n){  //比较到第n个（needle[n-1]），如果都相等，则说明存在，返回haystack中与needle第一个相同字符的编号
-                return (i+1);
+                return i;
             }
     }
     return 0;

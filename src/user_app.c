@@ -25,7 +25,7 @@ volatile myFlag myflag = {
                             1,  //system state flag 0:halt, 1:run
                             0,  //initialization state flag 0:not initialized yet, 1:initialized ready
                             0,  //used to record the number of bound mac addresses, x=0, 1, 2, 3
-                            0,  //unused
+                            0,  ////used to enter status of msg exc 0:not ready, 1:ready
                             0,  //unused
                          }; 
 #if (1 == DEVICE_ID)
@@ -90,7 +90,57 @@ uint8_t AT_Send(uint8_t *atcmd)
     return tag;
 }
 #endif
-
+/*************************************************************
+Function Name       : BLE_Send
+Function Description: send BLE cmd
+Param_in            : uint8_t *atcmd
+Param_out           : 
+Return Type         : u16 tag
+Note                : 0: succeed/1: failed
+Author              : Yan
+Time                : 2020-11-27
+*************************************************************/
+uint8_t BLE_Send(uint8_t *atcmd)
+{
+    uint16_t tag = 1;
+    uint8_t t;
+    USART1_RX_STA = 0;
+    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    uint8_t retry = 10;//number of AT command sending attempts
+    while (retry--)
+    {
+        if (0 == BLE_CTS_READ())
+        {
+            USART1_SendWord(atcmd);
+            delay_ms_1(2);
+        }
+        for (t = 0; t < 100; t++)//delay 200ms
+        {
+            if(USART1_RX_STA & 0x8000)
+                break;
+            delay_ms_1(2);
+        }
+        if ((USART1_RX_STA & 0x8000))//receive the data
+        {
+            USART1_RX_STA = 0;//clear the state flag
+            if ('y' == USART1_RX_buf[0])//Successful handshake
+            {
+                tag = 0;
+                break;
+            }
+            else if ('n' == USART1_RX_buf[0])//falied handshake
+            {
+                tag = 1;
+                break;
+            }
+        }
+    }
+    //clear the rx buffer
+    USART1_RX_STA = 0;
+    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    if(0 == retry)tag = 1;//enter failed
+    return tag;
+}
 /*************************************************************
 Function Name       : AT_Get_State
 Function Description: use AT to get BLE state
@@ -159,6 +209,62 @@ uint8_t AT_Get_State(char *sta)
     return tag;
 }
 /*************************************************************
+Function Name       : AT_Get_Cnt_List
+Function Description: get the connected device list
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-26
+*************************************************************/
+uint8_t AT_Get_Cnt_List(void)
+{
+    uint16_t tag = 1;
+    uint16_t temp = 1;
+    uint8_t t;
+    uint8_t retry = 10;
+    uint8_t stalen = 8;
+    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    while (retry--)
+    {
+        USART1_SendWord("AT+CNT_LIST\r\n");
+        delay_ms_1(10);
+        for ( t = 0; t < 10; t++)//50ms outtime
+        {
+            if(USART1_RX_STA & 0x8000)
+                break;
+            delay_ms_1(5);
+        }
+        if ((USART1_RX_STA & 0x8000))//receive the data
+        {
+            temp = USART1_RX_STA & 0x7FFF;//get the length of data
+            USART1_RX_STA = 0;//clear the state flag
+            if (
+                ('O' == USART1_RX_buf[temp-4]) &&
+                ('K' == USART1_RX_buf[temp-3]) )
+            {
+                tag = 0;//enter succeed 
+                break;  
+            }
+            
+        }
+    }
+    if(!tag && (0 != retry))
+    {
+        uint16_t i = 0;  
+        for (t = 5 + stalen; t < (temp - 4); t++)
+        {   //storage the relevant data in the buffer, empty it when access.   
+            USART1_STA_buf[i] = USART1_RX_buf[t];
+            i++;
+        }
+    }
+    //clear the rx buffer
+    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    if(0 == retry)tag = 1;//enter failed
+    return tag;
+}
+/*************************************************************
 Function Name       : BLE_Name_Change
 Function Description: change device name to notify that mesh finished
 Param_in            : ENABLE or DISABLE
@@ -172,22 +278,21 @@ void BLE_Name_Change(FunctionalState Newstate)
 {
     AT_Send("+++");
     assert_param(IS_FUNCTIONAL_STATE(Newstate));
-    if ((ENABLE == Newstate) && (myflag.BLE_STA_flag))
+    if (ENABLE == Newstate)
     {
         AT_Get_State("NAME");
         uint8_t *sta_ptr = USART1_STA_buf;
         USART1_STA_buf[0] = 'r';
         AT_Send((uint8_t *)(connect2("AT+NAME=", sta_ptr)));
-        myflag.BLE_STA_flag = 0;
     }
-    if ((DISABLE == Newstate) && (!myflag.BLE_STA_flag))
+    if (DISABLE == Newstate)
     {
         AT_Get_State("NAME");
         uint8_t *sta_ptr = USART1_STA_buf;
         USART1_STA_buf[0] = 'R';
         AT_Send((uint8_t *)(connect2("AT+NAME=", sta_ptr)));
-        myflag.BLE_STA_flag = 1;
     }
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
     AT_Send("AT+EXIT\r\n");
 }
 /*************************************************************
@@ -265,6 +370,8 @@ void BLE_status_run(void)
 {
     // LEDR_L();
     // LEDG_L();
+    if (1 == myflag.LINK_STA_flag)//process link msg
+        return;
     if (1 == myflag.BLE_STA_flag)//NON-MESH
     {
         
@@ -348,36 +455,43 @@ Time                : 2021-01-19
 *************************************************************/
 uint8_t BLE_FINISH_MESH(uint8_t num)
 {
-    uint8_t *mac_addr = (uint8_t *)malloc(19);
-    uint8_t sta_ptr = 0;
     uint8_t flag = 1;
+    AT_Get_Cnt_List();
+    uint8_t *sta_ptr = USART1_STA_buf;
+    uint8_t cur_cnt = 0;
+    uint8_t handle_list[3];
+    uint8_t i = 0;
+    while (*sta_ptr)
+    {
+        if (' ' == USART1_STA_buf[cur_cnt])
+        {
+            handle_list[i] = USART1_STA_buf[cur_cnt-1];
+            i++;
+        }
+        sta_ptr++;
+    }
+    i = 0;
+    uint8_t a[3];
+    a[1] = '\r';
+    a[2] = '\n';
+    uint8_t *a_ptr = a;
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+    AT_Send("AT+TTM_ROLE=1\r\n");
     while (num--)
     {
-        for (uint8_t i = 0; i<19; i++)
+        a[0] = handle_list[i];
+        AT_Send((uint8_t *)connect2("AT+DISCONNECT=2,", a_ptr));
+        i++;
+        for (uint8_t j = 0; j < 100; j++)//delay 200ms
         {
-            mac_addr[i] = USART1_STA_buf[sta_ptr++];
+            delay_ms_1(2);
+            if(USART1_RX_STA & 0x8000)
+                break;
         }
-        AT_Send((uint8_t *)(connect2("AT+CONNECT=,", mac_addr)));
-        AT_Send("AT+TTM_ROLE=1\r\n");
-        AT_Send("AT+EXIT\r\n");
-        USART1_SendWord("f");
-        uint8_t j = 0;
-        while (('s' != USART1_RX_buf[0]) && (100 > j))
-        {
-            delay_ms_1(10);
-            j++;                                        
-        }
-        if(100 == j)//outtime
-        {
-            flag = 0;
-            return flag;            
-        }
+        USART1_RX_STA = 0;
         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-        AT_Send("+++");
-        AT_Send("AT+DISCONNECT\r\n");
     }
-    memset(mac_addr, 0, sizeof(mac_addr));
-    free(mac_addr);
+    
     return flag;
 }
 
