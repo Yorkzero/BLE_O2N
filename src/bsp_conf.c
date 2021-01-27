@@ -130,8 +130,10 @@ void bsp_key_detec(void)
 #if(RELAY_DEV == DEVICE_ID)
         // USART1_RX_STA = 0;
         // memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-        // AT_Send("+++");
-        BLE_MESH();
+        // BLE_MESH();
+        AT_Send("+++");
+        AT_Send("AT+DEV_DEL=?\r\n");
+        AT_Send("AT+EXIT\r\n");
         // BLE_Init();
 #else
     
@@ -707,14 +709,11 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
                             {
                                 AT_Get_Cnt_List();
                                 uint8_t handler = strStr(sta_buf_ptr, mac_addr) - 3;
-                                uint8_t a[3];
+                                uint8_t a[] = "1\r\n";
                                 a[0] = USART1_STA_buf[handler];
-                                a[1] = '\r';
-                                a[2] = '\n';
-                                uint8_t *a_ptr = a;
                                 memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
                                 AT_Send("AT+TTM_ROLE=1\r\n");
-                                AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a_ptr));
+                                AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
                                 AT_Send("AT+EXIT\r\n");//exit AT mode
                                 if (0 == (BLE_Send("pairing request")))
                                 {
@@ -732,7 +731,7 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
                                 else
                                 {
                                     AT_Send("+++");
-                                    AT_Send((uint8_t *)connect2("AT+DISCONNECT=2,", a_ptr));
+                                    AT_Send((uint8_t *)connect2("AT+DISCONNECT=2,", a));
                                     AT_Send("AT+S_NAME=1\r\n");
                                     break;
                                 }
@@ -757,7 +756,7 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-    AT_Send("AT+EXIT\r\n");
+    
     myflag.MAC_NUM_flag = flag;
     return flag;
     
@@ -810,6 +809,7 @@ void request_msg_process(void)
                 {
                     myflag.MAC_NUM_flag += 1;
                     AT_Send("AT+DISCONNECT\r\n");
+                    AT_Send("AT+EXIT\r\n");
                     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
                     BLE_MESH();
                 }
@@ -831,10 +831,7 @@ void request_msg_process(void)
             }
             USART1_SendWord("y");
         }
-        else//invalid msg
-        {
-            USART1_SendWord("n");
-        }
+    
         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     }
 }

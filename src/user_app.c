@@ -374,7 +374,7 @@ void BLE_status_run(void)
         return;
     if (1 == myflag.BLE_STA_flag)//NON-MESH
     {
-        
+        LEDR_L();
         LEDG_R();
         delay_ms_1(500);
         LEDG_R();
@@ -382,7 +382,7 @@ void BLE_status_run(void)
     }
     else
     {
-        
+        LEDG_L();
         LEDR_R();
         delay_ms_1(500);
         LEDR_R();
@@ -402,16 +402,21 @@ Time                : 2021-01-15
 *************************************************************/
 void BLE_Init(void)
 {
-    if (1 == myflag.INIT_STA_flag)//avoid init again
-        return;
+    // if (1 == myflag.INIT_STA_flag)//avoid init again
+    //     return;
+    BLE_Name_Change(DISABLE);
     AT_Send("+++");//enter AT mode
     AT_Send("AT+ROLE=2\r\n");//set the role: slave and master
     AT_Send("AT+POWER=-10\r\n");//set the TX power as -30db
     AT_Send("AT+PACK=200,5\r\n");//set the pack range and frame as 200byte and 5ms outtime
     AT_Send("AT+CNT_INTERVAL=24\r\n");//set the connect interval as (24 * 1.25 = 30)ms
     AT_Send("AT+ADS=1,1,50\r\n");//set the advertise interval as 50ms
+    AT_Send("AT+DEV_DEL=ALL\r\n");//delet all device
     AT_Send("AT+RESTART\r\n");//restart the device
     AT_Send("AT+EXIT\r\n");
+    myflag.BLE_STA_flag = 1;
+    myflag.LINK_STA_flag = 0;
+    myflag.MAC_NUM_flag = 0;
     myflag.INIT_STA_flag = 1;//init ok
 }
 /*************************************************************
@@ -441,6 +446,13 @@ uint8_t BLE_MESH(void)
         myflag.BLE_STA_flag = 1;
         flag = 1;
     }
+    if (1 == myflag.MAC_NUM_flag)//only with master
+    {
+        myflag.BLE_STA_flag = 0;
+        flag = 0;
+    }
+    AT_Send("AT+ADS=1,1,1000\r\n");//set the advertise interval as 1s
+    AT_Send("AT+EXIT\r\n");
     return flag;
 }
 /*************************************************************
@@ -468,27 +480,37 @@ uint8_t BLE_FINISH_MESH(uint8_t num)
             handle_list[i] = USART1_STA_buf[cur_cnt-1];
             i++;
         }
+        cur_cnt++;
         sta_ptr++;
     }
     i = 0;
-    uint8_t a[3];
-    a[1] = '\r';
-    a[2] = '\n';
-    uint8_t *a_ptr = a;
+    uint8_t a[] = "1\r\n";
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-    AT_Send("AT+TTM_ROLE=1\r\n");
+    // AT_Send("AT+TTM_ROLE=1\r\n");
     while (num--)
     {
         a[0] = handle_list[i];
-        AT_Send((uint8_t *)connect2("AT+DISCONNECT=2,", a_ptr));
+        AT_Send((uint8_t *)connect2("AT+DISCONNECT=2,", a));
         i++;
-        for (uint8_t j = 0; j < 100; j++)//delay 200ms
+        uint8_t cnt = 10;
+        while (cnt--)//delay 2ms
         {
-            delay_ms_1(2);
-            if(USART1_RX_STA & 0x8000)
-                break;
+            for (uint8_t j = 0; j < 100; j++)//delay 200ms
+            {
+                delay_ms_1(2);
+                if(USART1_RX_STA & 0x8000)
+                    break;
+            }
+            if (USART1_RX_STA & 0x8000)
+            {
+                uint8_t t = USART1_RX_STA & 0x7fff;
+                USART1_RX_STA = 0;
+                if (('S' == USART1_RX_buf[t - 16]) && ('D' == USART1_RX_buf[t - 14]))
+                    break;
+                memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+            }
+            
         }
-        USART1_RX_STA = 0;
         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     }
     
