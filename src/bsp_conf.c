@@ -392,24 +392,9 @@ void beep_play(uint8_t style)
         LEDR_L();
         break;
     case E_BEEP_MODE_SUCCESS:
-        LEDR_L();
-        LEDG_H();
-        delay_ms_1(100);
-        bsp_beep_play_ms(E_BEEP_PERIOD_100US, 250);
-        LEDR_H();
-        LEDG_L();
-        delay_ms_1(100);
-        bsp_beep_play_ms(E_BEEP_PERIOD_100US, 250);
-        LEDR_L();
-        LEDG_H();
-        delay_ms_1(100);
-        bsp_beep_play_ms(E_BEEP_PERIOD_100US, 250);
-        LEDR_H();
-        LEDG_L();
-        delay_ms_1(100);
-        bsp_beep_play_ms(E_BEEP_PERIOD_100US, 250);
-        LEDR_L();
-        LEDG_L();
+        bsp_beep_play_ms(E_BEEP_PERIOD_100US, 300);
+        delay_ms_1(300);
+        bsp_beep_play_ms(E_BEEP_PERIOD_100US, 300);
         goto EXIT;
         break;
     case E_BEEP_MODE_RX:
@@ -508,7 +493,6 @@ Time                : 2020-12-26
 *************************************************************/
 void mode_IRQHandler(void)
 {
-    delay_ms_1(100);
     GPIO_Init(UART_RX_PORT, UART_RX_PIN, GPIO_Mode_In_PU_No_IT);      //UART receive init
     CLK_PeripheralClockConfig(CLK_Peripheral_USART1, ENABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, ENABLE);
@@ -519,6 +503,20 @@ void mode_IRQHandler(void)
     USART_Cmd(USART1, ENABLE);
     EXTI_ClearITPendingBit(EXTI_IT_Pin2);
     myflag.SYS_STA_flag = 1;
+}
+/*************************************************************
+Function Name       : bsp_rtc_IRQHandler
+Function Description: rtc IT function
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-28
+*************************************************************/
+void bsp_rtc_IRQHandler(void)
+{
+    rtc_delay_flag = 0;
 }
 /*************************************************************
 Function Name       : USART1_SendWord
@@ -756,7 +754,8 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-    
+    mac_addr = "0";
+    free(mac_addr);
     myflag.MAC_NUM_flag = flag;
     return flag;
     

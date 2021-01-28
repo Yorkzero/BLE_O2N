@@ -404,6 +404,13 @@ void BLE_Init(void)
 {
     // if (1 == myflag.INIT_STA_flag)//avoid init again
     //     return;
+    GPIO_Init(UART_RX_PORT, UART_RX_PIN, GPIO_Mode_In_PU_No_IT);      //UART receive init
+    CLK_PeripheralClockConfig(CLK_Peripheral_USART1, ENABLE);
+    CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, ENABLE);
+    CLK_PeripheralClockConfig(CLK_Peripheral_TIM3, ENABLE);
+    CLK_PeripheralClockConfig(CLK_Peripheral_TIM4,ENABLE);
+    USART_Cmd(USART1, ENABLE);
+    EXTI_ClearITPendingBit(EXTI_IT_Pin2);
     BLE_Name_Change(DISABLE);
     AT_Send("+++");//enter AT mode
     AT_Send("AT+ROLE=2\r\n");//set the role: slave and master
@@ -418,6 +425,8 @@ void BLE_Init(void)
     myflag.LINK_STA_flag = 0;
     myflag.MAC_NUM_flag = 0;
     myflag.INIT_STA_flag = 1;//init ok
+    FSM_Transfer(&system_FSM, S_STA_INIT);
+    beep_play(E_BEEP_MODE_INIT);
 }
 /*************************************************************
 Function Name       : BLE_MESH
@@ -533,14 +542,14 @@ void ble_lock(FunctionalState Newstate)
     if((ENABLE == Newstate) && (1 == myflag.LOCK_STA_flag))//lock the door
     {
         MOTO_FW();
-        delay_ms_1(250);
+        delay_10ms_rtc(25);
         MOTO_WT();
         myflag.LOCK_STA_flag = 0;//change the flag
     }
     else if ((DISABLE == Newstate) && (0 == myflag.LOCK_STA_flag))//open the door
     {
         MOTO_BW();
-        delay_ms_1(250);
+        delay_10ms_rtc(25);
         MOTO_WT();
         myflag.LOCK_STA_flag = 1;//change the flag
     }

@@ -19,6 +19,7 @@ Date     : 2020-11-20
 #include "stm8l15x.h" /*<std peripharal driver>*/
 #include "bsp_conf.h" /*<program bsp driver>*/
 #include "user_app.h" /*<user application>*/
+#include "sys_fsm.h"  /*<system finite state machine driver>*/
 #include "delay.h"    /*<delay driver>*/
 /*----------- Global Definitions and Declarations ----------*/
 //GPIO Definition

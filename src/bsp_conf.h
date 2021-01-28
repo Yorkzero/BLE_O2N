@@ -199,6 +199,17 @@ Time                : 2020-12-26
 *************************************************************/
 void mode_IRQHandler(void);
 /*************************************************************
+Function Name       : bsp_rtc_IRQHandler
+Function Description: rtc IT function
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-28
+*************************************************************/
+void bsp_rtc_IRQHandler(void);
+/*************************************************************
 Function Name       : USART1_SendWord
 Function Description: Transmits 8 bit *data through the USART1 peripharal
 Param_in            : *Data

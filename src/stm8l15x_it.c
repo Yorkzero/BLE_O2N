@@ -114,7 +114,11 @@ INTERRUPT_HANDLER(RTC_CSSLSE_IRQHandler, 4)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
-   
+  if (SET == RTC_GetITStatus(RTC_IT_WUT))
+  {
+    bsp_rtc_IRQHandler();
+    RTC_ClearITPendingBit(RTC_IT_WUT);
+  }
 }
 /**
   * @brief External IT PORTE/ PORTF and PVD Interrupt routine.

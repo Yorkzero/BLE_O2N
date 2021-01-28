@@ -56,12 +56,13 @@ int main(void)
     USART1_RX_STA = 0;
     BLE_SEND_ENABLE();
     delay_ms_1(100);
-    
+    FSM_Init(&system_FSM, sys_table, S_STA_INIT);
     while(1)
     {
         // halt();
-        BLE_status_run();
-        request_msg_process();
+        // BLE_status_run();
+        // request_msg_process();
+        FSM_Run();
     }
 #endif
 }
