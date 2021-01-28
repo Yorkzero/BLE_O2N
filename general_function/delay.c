@@ -274,6 +274,43 @@ void delay_ms_1(uint16_t n)
         delay_us_1(1000);
     }
 }
+/*************************************************************
+Function Name       : delay_10ms_rtc
+Function Description: use rtc AWU to delay 
+Param_in            : u16 n
+Param_out           : 
+Return Type         : 
+Note                : delay time = n*10 ms
+Author              : Yan
+Time                : 2021-01-28
+*************************************************************/
+void delay_10ms_rtc(uint16_t n)
+{
+    uint32_t cnt = n;
+    CLK_RTCClockConfig(CLK_RTCCLKSource_LSI, CLK_RTCCLKDiv_1);
+    while (RESET == CLK_GetFlagStatus(CLK_FLAG_LSIRDY));
+    CLK_PeripheralClockConfig(CLK_Peripheral_RTC, ENABLE);
+    RTC_WakeUpCmd(DISABLE);
+    RTC_WakeUpClockConfig(RTC_WakeUpClock_RTCCLK_Div16);
+    cnt = (cnt * 95) >> 2;
+    if (65535 <= cnt)
+    {
+        cnt = 65535;
+    }
+    RTC_SetWakeUpCounter(cnt);
+    RTC_ClearITPendingBit(RTC_IT_WUT);
+    RTC_ITConfig(RTC_IT_WUT, ENABLE);
+    rtc_delay_flag = 1;
+    RTC_WakeUpCmd(ENABLE);
+    while (rtc_delay_flag)
+    {
+        halt();
+    }
+    RTC_WakeUpCmd(DISABLE);
+    RTC_ITConfig(RTC_IT_WUT, DISABLE);
+    RTC_ClearITPendingBit(RTC_IT_WUT);
+    CLK_PeripheralClockConfig(CLK_Peripheral_RTC, DISABLE);
+}
 char *connect2(char *a, char *b) {
     char *c = (char *) malloc(strlen(a) + strlen(b) + 1); //'\0'½áÎ²Ìí¼Ó1
     if (c == NULL) exit (1);

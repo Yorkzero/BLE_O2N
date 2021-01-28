@@ -78,21 +78,17 @@ extern void delay_us_1(uint16_t n);
 extern void delay_ms_1(uint16_t n);
 #endif
 
-/******************************************************************************
-* Name     :delay_ms_2 
-*
-* Desc     :通过片上RTC的自动唤醒功能实现低功耗延时
-* Param_in :n：要延时的ms数，范围1~32767ms
-* Param_out:
-* Return   :
-* Global   :
-* Note     :
-* Author   :CenLinbo
-* -------------------------------------
-* Log     :2020/08/22, Create this function by CenLinbo
- ******************************************************************************/
-
-extern void delay_ms_2(uint16_t n);
+/*************************************************************
+Function Name       : delay_10ms_rtc
+Function Description: use rtc AWU to delay 
+Param_in            : u16 n
+Param_out           : 
+Return Type         : 
+Note                : delay time = n*10 ms
+Author              : Yan
+Time                : 2021-01-28
+*************************************************************/
+extern void delay_10ms_rtc(uint16_t n);
 // extern char *Connect(char* str1, char* str2, char* p);
 extern char *connect2(char *a, char *b);
 extern char *connect3(char *a, char *b, char *d);
