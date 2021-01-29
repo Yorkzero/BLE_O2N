@@ -93,6 +93,7 @@ extern void delay_10ms_rtc(uint16_t n);
 extern char *connect2(char *a, char *b);
 extern char *connect3(char *a, char *b, char *d);
 extern uint8_t strStr(uint8_t* haystack, uint8_t* needle);
+extern uint8_t strStr_2(uint8_t* haystack, uint8_t* needle);
 extern void Reverse(uint8_t *p , uint8_t size);
 #if 1
 //系统时钟1M时，指令周期为1us

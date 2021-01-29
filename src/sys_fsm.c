@@ -14,7 +14,8 @@ Date     : 2021-01-28
 #include "sys_fsm.h"
 
 /*----------- Global Definitions and Declarations ----------*/
-
+uint8_t addr_string_t[] = "00000000000000000000";//used to store the addr of target, format: xx:xx:xx:xx:xx:xx\r\n(1/0)
+uint8_t addr_string_m[] = "00000000000000000";//used to store the master addr, format: xx:xx:xx:xx:xx:xx
 FSM_table_t sys_table[]={
 /* 0*/    /*cur_state     event           eventfunction   next_state*/
 /* 1*/    {S_STA_INIT,    S_EVE_NOMESH,   Wait_for_mesh,  S_STA_MESH},
@@ -114,7 +115,7 @@ void FSM_Init(FSM_t *pFSM, FSM_table_t *pSYS_table, State initState)
 {
     FSM_Register(pFSM, pSYS_table);
     FSM_Transfer(pFSM, initState);
-    pFSM->size = sizeof(*pSYS_table) / sizeof(FSM_table_t);
+    pFSM->size = 11;
 }
 /*************************************************************
 Function Name       : FSM_Run
@@ -144,7 +145,7 @@ void FSM_Run(void)
         FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
         break;
     case S_STA_SEARCH://check the cnt_list
-
+        Transmitts_msg_process();
         break;
     case S_STA_SPEC://jump msg to the specified device
         FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
@@ -193,6 +194,17 @@ void Init_sta_detec(void)
     {
         myflag.BLE_STA_flag = 0;
         memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+        AT_Get_State("DEV_DEL=");
+        uint8_t *buf_ptr = USART1_STA_buf;
+        while (*buf_ptr)
+        {
+            
+            if ('\n' == *buf_ptr)
+            {
+                myflag.MAC_NUM_flag++;
+            }
+            buf_ptr++;
+        }
         AT_Send("AT+EXIT\r\n");
         FSM_EventHandler(&system_FSM, S_EVE_SLEEP);//halt
     }
@@ -246,10 +258,9 @@ void Sleep_Handler(void)
     USART_Cmd(USART1, DISABLE);
     GPIO_Init(UART_RX_PORT, UART_RX_PIN, GPIO_Mode_In_PU_IT);
     CLK_PeripheralClockConfig(CLK_Peripheral_USART1, DISABLE);
-    CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE);
+    // CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM3, DISABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM4,DISABLE);
-    myflag.SYS_STA_flag = 1;
     halt();
 }
 /*************************************************************
@@ -264,26 +275,29 @@ Time                : 2021-01-28
 *************************************************************/
 void Received_msg_process(void)
 {
-    for (uint8_t i = 0; i < 100; i++)
+    wfi();
+    for (uint8_t i = 0; i < 200; i++)
     {
         if (USART1_RX_STA & 0x8000)
             break;
-        delay_ms_1(2);
+        delay_ms_1(20);
     }
     if (USART1_RX_STA & 0x8000)
     {
-        uint8_t t = USART1_RX_STA & 0x7fff;
-        USART1_RX_STA = 0;
-        if (('h' == USART1_RX_buf[0]) && ('e' == USART1_RX_buf[1]))
+        if (('u' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))
         {
-            memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
             FSM_EventHandler(&system_FSM, S_EVE_RS1);
         }
-        if (('m' == USART1_RX_buf[0]) && ('a' == USART1_RX_buf[1]))
+        if (('m' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))
         {
             FSM_EventHandler(&system_FSM, S_EVE_RS2);
         }
     }
+    
+    
+    USART1_RX_STA = 0;
+    memset(USART1_RX_buf,0,sizeof(USART1_RX_buf));
+    
 }
 /*************************************************************
 Function Name       : Motor_Run
@@ -298,25 +312,20 @@ Time                : 2021-01-28
 void Motor_Run(void)
 {
     USART1_SendWord("y");
-    for (uint8_t i = 0; i < 100; i++)
+    delay_ms_1(10);
+    if ('1' == USART1_RX_buf[2])//open door
     {
-        if (USART1_RX_STA & 0x8000)
-            break;
-        delay_ms_1(2);
+        ble_lock(DISABLE);
     }
-    if (USART1_RX_STA & 0x8000)
+    if ('0' == USART1_RX_buf[2])//close door
     {
-        if ('o' == USART1_RX_buf[0])//open door
-        {
-            ble_lock(DISABLE);
-        }
-        if ('c' == USART1_RX_buf[0])//close door
-        {
-            ble_lock(ENABLE);
-        }
-        USART1_RX_STA = 0;
-        memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+        ble_lock(ENABLE);
     }
+    AT_Send("+++");
+    AT_Send("AT+DISCONNECT\r\n");
+    AT_Send("AT+EXIT\r\n");
+    USART1_RX_STA = 0;
+    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
 }
 /*************************************************************
 Function Name       : Search_List
@@ -330,7 +339,59 @@ Time                : 2021-01-28
 *************************************************************/
 void Search_List(void)
 {
-
+    for (uint8_t i = 0; i < 17; i++)//storage the master addr
+    {
+        addr_string_m[i] = USART1_RX_buf[i+2];
+    }
+    for (uint8_t i = 0; i < 20; i++)//storage the addr of target
+    {
+        addr_string_t[i] = USART1_RX_buf[i+22];
+    }
+    USART1_SendWord("y");
+    delay_ms_1(20);
+    AT_Send("+++");
+    AT_Send("AT+DISCONNECT\r\n");
+    delay_ms_1(100);
+    USART1_RX_STA = 0;
+    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    AT_Get_State("DEV_DEL=");
+    AT_Send("AT+EXIT\r\n");
+    uint8_t pos;
+    //detect flag
+    if (0 == (pos = strStr_2(USART1_STA_buf, addr_string_t)))//not bound
+    {
+        myflag.SPEC_flag = 0;//n
+        if (0 == (pos = strStr_2(USART1_STA_buf, addr_string_m)))//not repeat
+        {
+            myflag.REPEAT_flag = 1;//n
+        }
+        else
+        {
+            myflag.REPEAT_flag = 0;//y
+        }
+    }
+    else
+    {
+        myflag.SPEC_flag = 1;//y
+    }
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+}
+/*************************************************************
+Function Name       : Transmitts_msg_process
+Function Description: determine to send which kind of msg
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-29
+*************************************************************/
+void Transmitts_msg_process(void)
+{
+    if (myflag.SPEC_flag)
+        FSM_EventHandler(&system_FSM, S_EVE_TS1);
+    else
+        FSM_EventHandler(&system_FSM, S_EVE_TS2);
 }
 /*************************************************************
 Function Name       : Link_One
@@ -344,7 +405,41 @@ Time                : 2021-01-28
 *************************************************************/
 void Link_One(void)
 {
-
+    uint8_t addr_string[] = "00000000000000000\r\n";
+    for (uint8_t i = 0; i < 17; i++)
+    {
+        addr_string[i] = addr_string_t[i];
+    }
+    AT_Send("+++");
+    AT_Send((uint8_t *)connect2("AT+CONNECT=,", addr_string));
+    for (uint8_t i = 0; i < 100; i++)//delay 1s
+    {
+        delay_ms_1(10);
+        if(USART1_RX_STA & 0x8000)
+            break;
+    }
+    if ((USART1_RX_STA & 0x8000))
+    {
+        uint8_t t = USART1_RX_STA & 0x7FFF;//get the length of data
+        USART1_RX_STA = 0;
+        if ('C' == USART1_RX_buf[t-6])//successfully connected
+        {
+            AT_Send("AT+TTM_ROLE=1\r\n");
+            AT_Send("AT+EXIT\r\n");
+            if ('1' == addr_string_t[19])//open door
+                BLE_Send("u 1");
+            else
+                BLE_Send("u 0");
+            for (uint8_t i = 0; i < 100; i++)//delay 1s
+            {
+                delay_ms_1(10);
+                if(USART1_RX_STA & 0x8000)
+                    break;
+            }
+            USART1_RX_STA = 0;
+            memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+        }
+    }
 }
 /*************************************************************
 Function Name       : Link_All
@@ -358,7 +453,106 @@ Time                : 2021-01-28
 *************************************************************/
 void Link_All(void)
 {
-
+    if (myflag.REPEAT_flag)//no repeat
+    {
+        uint8_t i = myflag.MAC_NUM_flag;
+        AT_Send("+++");
+        AT_Send("AT+AUTO_CNT=1\r\n");
+        AT_Send("AT+SLEEP=,0\r\n");
+        AT_Send("AT+SLEEP=,1\r\n");
+        while (i--)
+        {
+            for (uint8_t i = 0; i < 100; i++)//delay 1s
+            {
+                if(USART1_RX_STA & 0x8000)
+                {
+                    USART1_RX_STA = 0;
+                    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+                    break;
+                }                    
+                delay_ms_1(10);                
+            }
+        }
+        AT_Send("AT+TTM_ROLE=1\r\n");
+        i = myflag.MAC_NUM_flag;
+        AT_Get_State("MAC");
+        for (uint8_t k = 0; k < 17; k++)//refresh master addr
+        {
+            addr_string_m[k] = USART1_STA_buf[k];
+        }
+        memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+        uint8_t trans_msg[] = "m 00000000000000000 t 00000000000000000\r\n0";
+        for (uint8_t k = 0; k < 17; k++)
+        {
+            trans_msg[k+2] = addr_string_m[k];
+            trans_msg[k+22] = addr_string_t[k];
+        }
+        trans_msg[41] = addr_string_t[19];
+        uint8_t handle[] = "0\r\n";
+        while (i--)
+        {
+            handle[0] += 1;
+            AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=",handle));
+            AT_Send("AT+EXIT\r\n");
+            BLE_Send(trans_msg);
+            AT_Send("+++");
+        }
+        AT_Send("AT+DISCONNECT\r\n");
+        AT_Send("AT+EXIT\r\n");
+    }
+    else//repeat
+    {
+        uint8_t i = myflag.MAC_NUM_flag - 1;
+        AT_Send("+++");       
+        uint8_t addr_string[] = "00000000000000000\r\n";
+        for (uint8_t i = 0; i < 17; i++)
+        {   
+            addr_string[i] = addr_string_m[i];
+        }
+        AT_Send("AT+AUTO_CNT=1\r\n");
+        AT_Send((uint8_t *)connect2("AT+AUTO_CNT=0,", addr_string));
+        AT_Send("AT+SLEEP=,0\r\n");
+        AT_Send("AT+SLEEP=,1\r\n");
+        while (i--)
+        {
+            for (uint8_t i = 0; i < 100; i++)//delay 1s
+            {
+                if(USART1_RX_STA & 0x8000)
+                {
+                    USART1_RX_STA = 0;
+                    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+                    break;
+                }                    
+                delay_ms_1(10);                
+            }
+        }
+        AT_Send("AT+TTM_ROLE=1\r\n");
+        i = myflag.MAC_NUM_flag - 1;
+        AT_Get_State("MAC");
+        for (uint8_t k = 0; k < 17; k++)//refresh master addr
+        {
+            addr_string_m[k] = USART1_STA_buf[k];
+        }
+        memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+        uint8_t trans_msg[] = "m 00000000000000000 t 00000000000000000\r\n0";
+        for (uint8_t k = 0; k < 17; k++)
+        {
+            trans_msg[k+2] = addr_string_m[k];
+            trans_msg[k+22] = addr_string_t[k];
+        }
+        trans_msg[41] = addr_string_t[19];
+        uint8_t handle[] = "0\r\n";
+        while (i--)
+        {
+            handle[0] += 1;
+            AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=",handle));
+            AT_Send("AT+EXIT\r\n");
+            BLE_Send(trans_msg);
+            AT_Send("+++");
+        }
+        AT_Send("AT+DISCONNECT\r\n");
+        AT_Send("AT+EXIT\r\n");
+    }
 }
 /*------------------- Function Implement -------------------*/
 

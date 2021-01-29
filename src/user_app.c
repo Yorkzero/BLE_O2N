@@ -22,16 +22,13 @@ Date     : 2020-11-23
 volatile myFlag myflag = {
                             1,  //BLE state flag 0:MESH, 1:NON-MESH
                             1,  //LOCK state flag 0:LOCKED, 1:UNLOCKED
-                            1,  //system state flag 0:halt, 1:run
+                            1,  //Determine whether there is a duplication 0:repeat, 1:no repeat
                             0,  //initialization state flag 0:not initialized yet, 1:initialized ready
                             0,  //used to record the number of bound mac addresses, x=0, 1, 2, 3
                             0,  ////used to enter status of msg exc 0:not ready, 1:ready
-                            0,  //unused
+                            0,  //Determine whether there is a specified device 0:n, 1:y
                          }; 
-#if (1 == DEVICE_ID)
-volatile uint8_t ctrl_string[] = "::000";//used to control LED group
-volatile uint8_t sta_string[] = "0000000000";//used to record node status
-#endif
+
 /*------------------- Function Prototype -------------------*/
 
 
@@ -225,6 +222,7 @@ uint8_t AT_Get_Cnt_List(void)
     uint8_t t;
     uint8_t retry = 10;
     uint8_t stalen = 8;
+    USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     while (retry--)
     {
@@ -371,7 +369,12 @@ void BLE_status_run(void)
     // LEDR_L();
     // LEDG_L();
     if (1 == myflag.LINK_STA_flag)//process link msg
+    {
+        LEDR_L();
+        LEDG_L();
         return;
+    }
+    
     if (1 == myflag.BLE_STA_flag)//NON-MESH
     {
         LEDR_L();
@@ -406,7 +409,7 @@ void BLE_Init(void)
     //     return;
     GPIO_Init(UART_RX_PORT, UART_RX_PIN, GPIO_Mode_In_PU_No_IT);      //UART receive init
     CLK_PeripheralClockConfig(CLK_Peripheral_USART1, ENABLE);
-    CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, ENABLE);
+    // CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, ENABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM3, ENABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM4,ENABLE);
     USART_Cmd(USART1, ENABLE);
@@ -424,6 +427,8 @@ void BLE_Init(void)
     myflag.BLE_STA_flag = 1;
     myflag.LINK_STA_flag = 0;
     myflag.MAC_NUM_flag = 0;
+    myflag.REPEAT_flag = 1;
+    myflag.SPEC_flag = 0;
     myflag.INIT_STA_flag = 1;//init ok
     FSM_Transfer(&system_FSM, S_STA_INIT);
     beep_play(E_BEEP_MODE_INIT);
@@ -460,7 +465,7 @@ uint8_t BLE_MESH(void)
         myflag.BLE_STA_flag = 0;
         flag = 0;
     }
-    AT_Send("AT+ADS=1,1,1000\r\n");//set the advertise interval as 1s
+    AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 0.5s
     AT_Send("AT+EXIT\r\n");
     return flag;
 }

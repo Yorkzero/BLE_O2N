@@ -16,8 +16,8 @@ Date     : 2021-01-28
 #include "main.h"
 
 /*----------- Global Definitions and Declarations ----------*/
-
-
+extern uint8_t addr_string_t[];//used to store the addr of target
+extern uint8_t addr_string_m[];//used to store the master addr
 /*-------------------- Type Declarations -------------------*/
 typedef uint8_t State;
 typedef uint8_t Event;
@@ -189,6 +189,17 @@ Author              : Yan
 Time                : 2021-01-28
 *************************************************************/
 void Search_List(void);
+/*************************************************************
+Function Name       : Transmitts_msg_process
+Function Description: determine to send which kind of msg
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-29
+*************************************************************/
+void Transmitts_msg_process(void);
 /*************************************************************
 Function Name       : Link_One
 Function Description: link to the specified one

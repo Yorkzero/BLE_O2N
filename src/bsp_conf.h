@@ -232,17 +232,6 @@ Time                : 2020-12-10
 *************************************************************/
 void data_packet_process(uint8_t *longdata);
 /*************************************************************
-Function Name       : node_info_query
-Function Description: inquire the information of node
-Param_in            : 
-Param_out           : 
-Return Type         : 
-Note                : 
-Author              : Yan
-Time                : 2020-12-10
-*************************************************************/
-void node_info_query(void);
-/*************************************************************
 Function Name       : scan_packet_process
 Function Description: used to process scan packet
 Param_in            : uint16_t scan_cnt(1~50ms per scan)

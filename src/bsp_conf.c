@@ -116,6 +116,7 @@ void bsp_key_detec(void)
 {
     LEDG_L();
     LEDR_L();
+    BLE_Init();
     bsp_tim2_init(12500);//100ms upload
     delay_ms_1(20);//avoid shaking
     if(!KEY_READ())
@@ -131,10 +132,10 @@ void bsp_key_detec(void)
         // USART1_RX_STA = 0;
         // memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
         // BLE_MESH();
-        AT_Send("+++");
-        AT_Send("AT+DEV_DEL=?\r\n");
-        AT_Send("AT+EXIT\r\n");
-        // BLE_Init();
+        // AT_Send("+++");
+        // AT_Send("AT+DEV_DEL=?\r\n");
+        // AT_Send("AT+EXIT\r\n");
+        
 #else
     
 #endif
@@ -495,14 +496,13 @@ void mode_IRQHandler(void)
 {
     GPIO_Init(UART_RX_PORT, UART_RX_PIN, GPIO_Mode_In_PU_No_IT);      //UART receive init
     CLK_PeripheralClockConfig(CLK_Peripheral_USART1, ENABLE);
-    CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, ENABLE);
+    // CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, ENABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM3, ENABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM4,ENABLE);
     
     
     USART_Cmd(USART1, ENABLE);
     EXTI_ClearITPendingBit(EXTI_IT_Pin2);
-    myflag.SYS_STA_flag = 1;
 }
 /*************************************************************
 Function Name       : bsp_rtc_IRQHandler
@@ -574,55 +574,6 @@ void data_packet_process(uint8_t *longdata)
         USART_SendData8(USART1, *Data++);
         while (!USART_GetFlagStatus(USART1, USART_FLAG_TXE));
     }
-}
-/*************************************************************
-Function Name       : node_info_query
-Function Description: inquire the information of node
-Param_in            : 
-Param_out           : 
-Return Type         : 
-Note                : 
-Author              : Yan
-Time                : 2020-12-10
-*************************************************************/
-void node_info_query(void)
-{
-    uint8_t *temp_string;//intermediate variables
-    // uint8_t *node_info_string = "N2: 0\r\nN3: 0\r\nN4: 0\r\nN5: 0\r\nN6: 0\r\nN7: 0\r\nN8: 0\r\nN9: 0\r\n";//record the status of node
-    uint8_t k = 4, j = 0;
-    temp_string = (uint8_t *)ctrl_string;
-    temp_string += 3;
-    uint8_t i =strlen(temp_string);
-    i *= 7;
-    uint8_t *node_info_string = (uint8_t *)malloc(i+1);//record the status of node
-    memset(node_info_string, 0, sizeof(node_info_string));
-    for (i = 0; i < (strlen(temp_string) * 7); i+=7)
-    {
-        node_info_string[i] = 'N';
-        node_info_string[i+1] = '2' + j;
-        node_info_string[i+2] = ':';
-        node_info_string[i+3] = ' ';
-        node_info_string[i+4] = '0';
-        node_info_string[i+5] = '\r';
-        node_info_string[i+6] = '\n';
-        j++;
-    }
-    
-    node_info_string+=4;
-    *node_info_string = *temp_string;
-    temp_string++;   
-    while (*temp_string)
-    {
-        node_info_string+=7;
-        *node_info_string = *temp_string;
-        k+=7;
-        temp_string++;
-    }
-    node_info_string -= k;
-    data_packet_process(node_info_string);
-    free(node_info_string);//release the rom
-    node_info_string = NULL;
-    
 }
 /*************************************************************
 Function Name       : scan_packet_process

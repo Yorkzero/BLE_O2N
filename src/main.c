@@ -55,8 +55,9 @@ int main(void)
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     USART1_RX_STA = 0;
     BLE_SEND_ENABLE();
-    delay_ms_1(100);
+    delay_ms_1(500);
     FSM_Init(&system_FSM, sys_table, S_STA_INIT);
+    // BLE_Init();
     while(1)
     {
         // halt();
