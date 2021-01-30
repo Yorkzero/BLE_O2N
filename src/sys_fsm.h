@@ -40,6 +40,7 @@ extern FSM_t system_FSM;
 enum sys_state{
     S_STA_INIT = 0, //init state
     S_STA_MESH,     //start to mesh
+    S_STA_MESH_OK,  //mesh OK
     S_STA_HALT,     //halt
     S_STA_WFM,      //wait for msg
     S_STA_MOV,      //motor move
@@ -52,6 +53,7 @@ enum sys_event{
     S_EVE_NOMESH,   //not meshed yet
     S_EVE_RS1,      //receive sitiuation 1: itself is a designated device
     S_EVE_RS2,      //receive sitiuation 2: itself is not a designated device
+    S_EVE_RS3,      //receive sitiuation 3: receive mesh OK msg
     S_EVE_TS1,      //transmitts sitiuation 1: the specified device was found in the device list
     S_EVE_TS2,      //transmitts sitiuation 2: the specified device was not found in the device list
     S_EVE_SLEEP,    //end this action and go to sleep
@@ -167,6 +169,17 @@ Author              : Yan
 Time                : 2021-01-28
 *************************************************************/
 void Received_msg_process(void);
+/*************************************************************
+Function Name       : Mesh_success
+Function Description: Send networking success command to the host
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-30
+*************************************************************/
+void Mesh_success(void);
 /*************************************************************
 Function Name       : Motor_Run
 Function Description: control the motor of the device

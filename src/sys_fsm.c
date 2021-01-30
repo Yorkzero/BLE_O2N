@@ -17,18 +17,20 @@ Date     : 2021-01-28
 uint8_t addr_string_t[] = "00000000000000000000";//used to store the addr of target, format: xx:xx:xx:xx:xx:xx\r\n(1/0)
 uint8_t addr_string_m[] = "00000000000000000";//used to store the master addr, format: xx:xx:xx:xx:xx:xx
 FSM_table_t sys_table[]={
-/* 0*/    /*cur_state     event           eventfunction   next_state*/
-/* 1*/    {S_STA_INIT,    S_EVE_NOMESH,   Wait_for_mesh,  S_STA_MESH},
-/* 2*/    {S_STA_HALT,    S_EVE_ITWU,     Halt_to_wait,   S_STA_WFM},
-/* 3*/    {S_STA_WFM,     S_EVE_RS1,      Motor_Run,      S_STA_MOV},
-/* 4*/    {S_STA_WFM,     S_EVE_RS2,      Search_List,    S_STA_SEARCH},
-/* 5*/    {S_STA_SEARCH,  S_EVE_TS1,      Link_One,       S_STA_SPEC},
-/* 6*/    {S_STA_SEARCH,  S_EVE_TS2,      Link_All,       S_STA_HOP},
-/* 7*/    {S_STA_MOV,     S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
-/* 8*/    {S_STA_SPEC,    S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
-/* 9*/    {S_STA_HOP,     S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
-/*10*/    {S_STA_INIT,    S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
-/*11*/    {S_STA_MESH,    S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
+/**/    /*cur_state     event           eventfunction   next_state*/
+/**/    {S_STA_INIT,    S_EVE_NOMESH,   Wait_for_mesh,  S_STA_MESH},
+/**/    {S_STA_HALT,    S_EVE_ITWU,     Halt_to_wait,   S_STA_WFM},
+/**/    {S_STA_WFM,     S_EVE_RS1,      Motor_Run,      S_STA_MOV},
+/**/    {S_STA_WFM,     S_EVE_RS2,      Search_List,    S_STA_SEARCH},
+/**/    {S_STA_WFM,     S_EVE_RS3,      Mesh_success,   S_STA_MESH_OK},
+/**/    {S_STA_SEARCH,  S_EVE_TS1,      Link_One,       S_STA_SPEC},
+/**/    {S_STA_SEARCH,  S_EVE_TS2,      Link_All,       S_STA_HOP},
+/**/    {S_STA_MOV,     S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
+/**/    {S_STA_SPEC,    S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
+/**/    {S_STA_HOP,     S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
+/**/    {S_STA_INIT,    S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
+/**/    {S_STA_MESH,    S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
+/**/    {S_STA_MESH_OK, S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
 };
 FSM_t system_FSM;//init system FSM
 /*-------------------- Type Declarations -------------------*/
@@ -153,6 +155,9 @@ void FSM_Run(void)
     case S_STA_HOP://jump msg to other devices
         FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
         break;
+    case S_STA_MESH_OK://mesh OK
+        FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
+        break;
     default:
         break;
     }
@@ -172,9 +177,8 @@ void Halt_to_wait(void)
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     AT_Send("+++");
-    AT_Send("AT+TTM_ROLE=0\r\n");
+    AT_Send("AT+TTM_ROLE=1\r\n");
     AT_Send("AT+EXIT\r\n");
-    BLE_Send("ready for msg");
 }
 /*************************************************************
 Function Name       : Init_sta_detec
@@ -194,6 +198,7 @@ void Init_sta_detec(void)
     {
         myflag.BLE_STA_flag = 0;
         memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+        AT_Get_Cnt_List();
         AT_Get_State("DEV_DEL=");
         uint8_t *buf_ptr = USART1_STA_buf;
         while (*buf_ptr)
@@ -221,7 +226,8 @@ void Init_sta_detec(void)
             myflag.BLE_STA_flag = 0;
             memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
             AT_Send("AT+EXIT\r\n");
-            FSM_EventHandler(&system_FSM, S_EVE_SLEEP);//halt
+            // FSM_EventHandler(&system_FSM, S_EVE_SLEEP);//halt
+            FSM_Transfer(&system_FSM, S_STA_WFM);
         }
     }
 }
@@ -276,21 +282,30 @@ Time                : 2021-01-28
 void Received_msg_process(void)
 {
     wfi();
+    // halt();
     for (uint8_t i = 0; i < 200; i++)
     {
         if (USART1_RX_STA & 0x8000)
             break;
-        delay_ms_1(20);
+        delay_ms_1(5);
     }
+    
     if (USART1_RX_STA & 0x8000)
     {
+        USART1_SendWord("y");
+        delay_ms_1(20);
+        uint8_t t = USART1_RX_STA & 0x7fff;
         if (('u' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))
         {
             FSM_EventHandler(&system_FSM, S_EVE_RS1);
         }
-        if (('m' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))
+        if (('c' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[t-1]))
         {
             FSM_EventHandler(&system_FSM, S_EVE_RS2);
+        }
+        if (('m' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[t-1]))
+        {
+            FSM_EventHandler(&system_FSM, S_EVE_RS3);
         }
     }
     
@@ -298,6 +313,40 @@ void Received_msg_process(void)
     USART1_RX_STA = 0;
     memset(USART1_RX_buf,0,sizeof(USART1_RX_buf));
     
+}
+/*************************************************************
+Function Name       : Mesh_success
+Function Description: Send networking success command to the host
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-30
+*************************************************************/
+void Mesh_success(void)
+{
+    uint8_t t = USART1_RX_STA & 0x7fff;
+    uint8_t *m_string = (uint8_t *)malloc(t);
+    uint8_t i = 0;
+    while (t--)
+    {
+        m_string[i] = USART1_RX_buf[i];
+        i++;
+    }
+    AT_Send("+++");
+    AT_Send("AT+TTM_ROLE=0\r\n");
+    AT_Get_State("MAC");
+    AT_Send("AT+EXIT\r\n");
+    uint8_t string_m[] = "00:00 ";
+    for (uint8_t i = 0; i < 5; i++)
+    {
+        string_m[i] = USART1_STA_buf[i+12];
+    }
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+    BLE_Send((uint8_t*)connect2(m_string, string_m));
+    memset(m_string, 0, sizeof(m_string));
+    free(m_string);
 }
 /*************************************************************
 Function Name       : Motor_Run

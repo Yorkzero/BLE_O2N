@@ -603,7 +603,11 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
     while (retry--)
     {
         if (3 == flag)
+        {
+            AT_Send("AT+S_NAME=0\r\n");//stop scaN
             break;
+        }
+            
         for (t = 0; t < 50; t++)//50 ms redundancy
         {
             if(USART1_RX_STA & 0x8000)
@@ -671,6 +675,7 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
                                     AT_Get_State("MAC");
                                     AT_Send("AT+EXIT\r\n");
                                     BLE_Send((uint8_t *)connect2("1 ", sta_buf_ptr));
+                                    // BLE_Send("en");
                                     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
                                     AT_Send("+++");
                                     
@@ -731,7 +736,7 @@ void request_msg_process(void)
         if (('S' == USART1_RX_buf[0]) && ('C' == USART1_RX_buf[2]))//be connected
         {
             myflag.LINK_STA_flag = 1;
-            
+            myflag.MAC_NUM_flag += 1;
         }
         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     }
@@ -742,28 +747,6 @@ void request_msg_process(void)
         if (('S' == USART1_RX_buf[0]) && ('D' == USART1_RX_buf[2]))//be disconnected
         {
             myflag.LINK_STA_flag = 0;//stop linked flag
-            uint8_t *sta_buf_ptr = USART1_STA_buf;
-            AT_Send("+++");
-            AT_Send((uint8_t *)connect2("AT+CONNECT=,", sta_buf_ptr));
-            for (uint8_t i = 0; i < 100; i++)//delay 1s
-            {
-                delay_ms_1(10);
-                if(USART1_RX_STA & 0x8000)
-                    break;
-            }
-            if ((USART1_RX_STA & 0x8000))
-            {
-                t = USART1_RX_STA & 0x7FFF;//get the length of data
-                USART1_RX_STA = 0;
-                if ('C' == USART1_RX_buf[t-6])//successfully connected
-                {
-                    myflag.MAC_NUM_flag += 1;
-                    AT_Send("AT+DISCONNECT\r\n");
-                    AT_Send("AT+EXIT\r\n");
-                    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-                    BLE_MESH();
-                }
-            }
         }    
         if (('p' == USART1_RX_buf[0]) && ('a' == USART1_RX_buf[1]))//be connected
         {
@@ -781,7 +764,12 @@ void request_msg_process(void)
             }
             USART1_SendWord("y");
         }
-    
+        if (('e' == USART1_RX_buf[0]) && ('n' == USART1_RX_buf[1]))//en mesh
+        {
+            USART1_SendWord("y");
+            delay_ms_1(20);
+            BLE_MESH();
+        }    
         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     }
 }
