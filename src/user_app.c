@@ -26,7 +26,7 @@ volatile myFlag myflag = {
                             0,  //initialization state flag 0:not initialized yet, 1:initialized ready
                             0,  //used to record the number of bound mac addresses, x=0, 1, 2, 3
                             0,  ////used to enter status of msg exc 0:not ready, 1:ready
-                            0,  //Determine whether there is a specified device 0:n, 1:y
+                            0,  //Determine whether to send hop msg or ending control msg 0:hop, 1:end
                          }; 
 
 /*------------------- Function Prototype -------------------*/
@@ -428,7 +428,7 @@ void BLE_Init(void)
     myflag.LINK_STA_flag = 0;
     myflag.MAC_NUM_flag = 0;
     myflag.REPEAT_flag = 1;
-    myflag.SPEC_flag = 0;
+    myflag.HOP_STA_flag = 0;
     myflag.INIT_STA_flag = 1;//init ok
     FSM_Transfer(&system_FSM, S_STA_INIT);
     beep_play(E_BEEP_MODE_INIT);
@@ -450,7 +450,7 @@ uint8_t BLE_MESH(void)
     uint8_t flag = 1;
     AT_Send("+++");//enter AT mode
     uint8_t num = scan_packet_process(100);
-    if (1 == myflag.MAC_NUM_flag)//only with master
+    if (0 == myflag.MAC_NUM_flag)//only with master
     {
         myflag.BLE_STA_flag = 0;
         flag = 0;
@@ -465,6 +465,8 @@ uint8_t BLE_MESH(void)
         }
         memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
         USART1_SendWord(string_m);
+        delay_ms_1(20);
+        USART1_SendWord("done!");
         return flag;
     }
     else

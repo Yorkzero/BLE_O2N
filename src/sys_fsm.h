@@ -44,18 +44,18 @@ enum sys_state{
     S_STA_HALT,     //halt
     S_STA_WFM,      //wait for msg
     S_STA_MOV,      //motor move
-    S_STA_SEARCH,   //search the bound device
+    S_STA_DWM,      //deal with the master msg
     S_STA_SPEC,     //link to the specified device
     S_STA_HOP,      //hop message to bound devices     
 };
 enum sys_event{
     S_EVE_ITWU = 0, //wake uped by IT
     S_EVE_NOMESH,   //not meshed yet
+    S_EVE_WFI,      //wait for mac message
     S_EVE_RS1,      //receive sitiuation 1: itself is a designated device
     S_EVE_RS2,      //receive sitiuation 2: itself is not a designated device
-    S_EVE_RS3,      //receive sitiuation 3: receive mesh OK msg
-    S_EVE_TS1,      //transmitts sitiuation 1: the specified device was found in the device list
-    S_EVE_TS2,      //transmitts sitiuation 2: the specified device was not found in the device list
+    S_EVE_TS1,      //transmitts sitiuation 1: transmitts msg to the target
+    S_EVE_TS2,      //transmitts sitiuation 2: hop msg to next device
     S_EVE_SLEEP,    //end this action and go to sleep
 };
 /*------------------- Function Prototype -------------------*/
@@ -170,6 +170,17 @@ Time                : 2021-01-28
 *************************************************************/
 void Received_msg_process(void);
 /*************************************************************
+Function Name       : Mesh_wfm
+Function Description: deal with mesh msg
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-31
+*************************************************************/
+void Mesh_wfm(void);
+/*************************************************************
 Function Name       : Mesh_success
 Function Description: Send networking success command to the host
 Param_in            : 
@@ -183,25 +194,25 @@ void Mesh_success(void);
 /*************************************************************
 Function Name       : Motor_Run
 Function Description: control the motor of the device
-Param_in            : 
+Param_in            : uint8_t *string_m
 Param_out           : 
 Return Type         : 
 Note                : 
 Author              : Yan
 Time                : 2021-01-28
 *************************************************************/
-void Motor_Run(void);
+void Motor_Run(uint8_t *string_m);
 /*************************************************************
-Function Name       : Search_List
-Function Description: search the specified device
+Function Name       : Master_msg_preproc
+Function Description: Master msg preprocess
 Param_in            : 
 Param_out           : 
 Return Type         : 
-Note                : 
+Note                : format 1(0) xx:xx xx:xx xx:xx
 Author              : Yan
 Time                : 2021-01-28
 *************************************************************/
-void Search_List(void);
+void Master_msg_preproc(void);
 /*************************************************************
 Function Name       : Transmitts_msg_process
 Function Description: determine to send which kind of msg
@@ -214,8 +225,8 @@ Time                : 2021-01-29
 *************************************************************/
 void Transmitts_msg_process(void);
 /*************************************************************
-Function Name       : Link_One
-Function Description: link to the specified one
+Function Name       : Link_End
+Function Description: link to the ended one
 Param_in            : 
 Param_out           : 
 Return Type         : 
@@ -223,10 +234,10 @@ Note                :
 Author              : Yan
 Time                : 2021-01-28
 *************************************************************/
-void Link_One(void);
+void Link_End(void);
 /*************************************************************
-Function Name       : Link_All
-Function Description: link to all bound devices, , except for the repeated one
+Function Name       : Link_Hop
+Function Description: hop msg to next device
 Param_in            : 
 Param_out           : 
 Return Type         : 
@@ -234,7 +245,7 @@ Note                :
 Author              : Yan
 Time                : 2021-01-28
 *************************************************************/
-void Link_All(void);
+void Link_Hop(void);
 /*------------------- Function Implement -------------------*/
 
 #endif

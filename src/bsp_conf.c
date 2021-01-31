@@ -587,7 +587,7 @@ Time                : 2021-01-15
 *************************************************************/
 uint8_t scan_packet_process(uint16_t scan_cnt)
 {
-    uint8_t flag = myflag.MAC_NUM_flag;
+    uint8_t flag = 0;
     uint8_t t;
     uint16_t retry = scan_cnt;
     uint8_t *rx_buf_ptr = USART1_RX_buf;//debug monitoring pointer
@@ -602,7 +602,7 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
     AT_Send("AT+S_NAME=1\r\n");//start scan
     while (retry--)
     {
-        if (3 == flag)
+        if (2 == flag)
         {
             AT_Send("AT+S_NAME=0\r\n");//stop scaN
             break;
@@ -736,7 +736,6 @@ void request_msg_process(void)
         if (('S' == USART1_RX_buf[0]) && ('C' == USART1_RX_buf[2]))//be connected
         {
             myflag.LINK_STA_flag = 1;
-            myflag.MAC_NUM_flag += 1;
         }
         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     }

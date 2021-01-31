@@ -17,20 +17,19 @@ Date     : 2021-01-28
 uint8_t addr_string_t[] = "00000000000000000000";//used to store the addr of target, format: xx:xx:xx:xx:xx:xx\r\n(1/0)
 uint8_t addr_string_m[] = "00000000000000000";//used to store the master addr, format: xx:xx:xx:xx:xx:xx
 FSM_table_t sys_table[]={
-/**/    /*cur_state     event           eventfunction   next_state*/
-/**/    {S_STA_INIT,    S_EVE_NOMESH,   Wait_for_mesh,  S_STA_MESH},
-/**/    {S_STA_HALT,    S_EVE_ITWU,     Halt_to_wait,   S_STA_WFM},
-/**/    {S_STA_WFM,     S_EVE_RS1,      Motor_Run,      S_STA_MOV},
-/**/    {S_STA_WFM,     S_EVE_RS2,      Search_List,    S_STA_SEARCH},
-/**/    {S_STA_WFM,     S_EVE_RS3,      Mesh_success,   S_STA_MESH_OK},
-/**/    {S_STA_SEARCH,  S_EVE_TS1,      Link_One,       S_STA_SPEC},
-/**/    {S_STA_SEARCH,  S_EVE_TS2,      Link_All,       S_STA_HOP},
-/**/    {S_STA_MOV,     S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
-/**/    {S_STA_SPEC,    S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
-/**/    {S_STA_HOP,     S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
-/**/    {S_STA_INIT,    S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
-/**/    {S_STA_MESH,    S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
-/**/    {S_STA_MESH_OK, S_EVE_SLEEP,    Sleep_Handler,  S_STA_HALT},
+/**/    /*cur_state     event           eventfunction       next_state*/
+/**/    {S_STA_INIT,    S_EVE_NOMESH,   Wait_for_mesh,      S_STA_MESH},
+/**/    {S_STA_HALT,    S_EVE_ITWU,     Halt_to_wait,       S_STA_WFM},
+/**/    {S_STA_WFM,     S_EVE_RS1,      Motor_Run,          S_STA_MOV},
+/**/    {S_STA_WFM,     S_EVE_RS2,      Master_msg_preproc, S_STA_DWM},
+/**/    {S_STA_DWM,     S_EVE_TS1,      Link_End,           S_STA_SPEC},
+/**/    {S_STA_DWM,     S_EVE_TS2,      Link_Hop,           S_STA_HOP},
+/**/    {S_STA_MOV,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_SPEC,    S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_HOP,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_INIT,    S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_MESH,    S_EVE_WFI,      Mesh_wfm,           S_STA_MESH_OK},
+/**/    {S_STA_MESH_OK, S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
 };
 FSM_t system_FSM;//init system FSM
 /*-------------------- Type Declarations -------------------*/
@@ -134,8 +133,10 @@ void FSM_Run(void)
     switch (system_FSM.cur_state)
     {
     case S_STA_INIT:
-    case S_STA_MESH:
         Init_sta_detec();//initial state detect
+        break;
+    case S_STA_MESH:
+        FSM_EventHandler(&system_FSM, S_EVE_WFI);
         break;
     case S_STA_HALT://wake up
         FSM_EventHandler(&system_FSM, S_EVE_ITWU);
@@ -146,7 +147,7 @@ void FSM_Run(void)
     case S_STA_MOV://control the motor
         FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
         break;
-    case S_STA_SEARCH://check the cnt_list
+    case S_STA_DWM://deal with the master msg
         Transmitts_msg_process();
         break;
     case S_STA_SPEC://jump msg to the specified device
@@ -198,7 +199,6 @@ void Init_sta_detec(void)
     {
         myflag.BLE_STA_flag = 0;
         memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-        AT_Get_Cnt_List();
         AT_Get_State("DEV_DEL=");
         uint8_t *buf_ptr = USART1_STA_buf;
         while (*buf_ptr)
@@ -211,6 +211,7 @@ void Init_sta_detec(void)
             buf_ptr++;
         }
         AT_Send("AT+EXIT\r\n");
+        memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
         FSM_EventHandler(&system_FSM, S_EVE_SLEEP);//halt
     }
     if ('R' == USART1_STA_buf[0])//non-meshed
@@ -226,8 +227,8 @@ void Init_sta_detec(void)
             myflag.BLE_STA_flag = 0;
             memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
             AT_Send("AT+EXIT\r\n");
-            // FSM_EventHandler(&system_FSM, S_EVE_SLEEP);//halt
-            FSM_Transfer(&system_FSM, S_STA_WFM);
+            
+            // FSM_Transfer(&system_FSM, S_STA_WFM);
         }
     }
 }
@@ -294,18 +295,14 @@ void Received_msg_process(void)
     {
         USART1_SendWord("y");
         delay_ms_1(20);
-        uint8_t t = USART1_RX_STA & 0x7fff;
         if (('u' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))
         {
             FSM_EventHandler(&system_FSM, S_EVE_RS1);
         }
-        if (('c' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[t-1]))
+        if ((('1' == USART1_RX_buf[0]) || ('0' == USART1_RX_buf[0]))
+             && (' ' == USART1_RX_buf[1]))
         {
             FSM_EventHandler(&system_FSM, S_EVE_RS2);
-        }
-        if (('m' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[t-1]))
-        {
-            FSM_EventHandler(&system_FSM, S_EVE_RS3);
         }
     }
     
@@ -315,16 +312,68 @@ void Received_msg_process(void)
     
 }
 /*************************************************************
+Function Name       : Mesh_wfm
+Function Description: deal with mesh msg
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-01-31
+*************************************************************/
+void Mesh_wfm(void)
+{
+    if (!myflag.MAC_NUM_flag)//no slave
+        return;
+    AT_Send("+++");
+    AT_Get_State("MAC");
+    AT_Send("AT+TTM_ROLE=0\r\n");
+    AT_Send("AT+EXIT\r\n");
+    uint8_t string_m[] = "00:00 ";
+    for (uint8_t i = 0; i < 5; i++)
+    {
+        string_m[i] = USART1_STA_buf[i+12];
+    }
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+    uint8_t device_cnt = myflag.MAC_NUM_flag;//number of slaves
+    while (device_cnt)
+    {
+        wfi();
+        for (uint8_t i = 0; i < 200; i++)
+        {
+            if (USART1_RX_STA & 0x8000)
+                break;
+            delay_ms_1(5);
+        }
+        if (USART1_RX_STA & 0x8000)
+        {
+            if ('d' == USART1_RX_buf[0])//slave msg done
+            {
+                device_cnt--;
+                continue;
+            }
+            if ('m' == USART1_RX_buf[0])//slave msg
+            {
+                Mesh_success(string_m);
+            }
+            memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+            USART1_RX_STA = 0;
+        }
+    }
+    USART1_SendWord("done!");//fininsh mesh msg send
+    
+}
+/*************************************************************
 Function Name       : Mesh_success
 Function Description: Send networking success command to the host
-Param_in            : 
+Param_in            : uint8_t *string_m
 Param_out           : 
 Return Type         : 
 Note                : 
 Author              : Yan
 Time                : 2021-01-30
 *************************************************************/
-void Mesh_success(void)
+void Mesh_success(uint8_t *string_m)
 {
     uint8_t t = USART1_RX_STA & 0x7fff;
     uint8_t *m_string = (uint8_t *)malloc(t);
@@ -334,17 +383,7 @@ void Mesh_success(void)
         m_string[i] = USART1_RX_buf[i];
         i++;
     }
-    AT_Send("+++");
-    AT_Send("AT+TTM_ROLE=0\r\n");
-    AT_Get_State("MAC");
-    AT_Send("AT+EXIT\r\n");
-    uint8_t string_m[] = "00:00 ";
-    for (uint8_t i = 0; i < 5; i++)
-    {
-        string_m[i] = USART1_STA_buf[i+12];
-    }
-    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-    BLE_Send((uint8_t*)connect2(m_string, string_m));
+    USART1_SendWord((uint8_t*)connect2(m_string, string_m));
     memset(m_string, 0, sizeof(m_string));
     free(m_string);
 }
@@ -370,60 +409,33 @@ void Motor_Run(void)
     {
         ble_lock(ENABLE);
     }
-    AT_Send("+++");
-    AT_Send("AT+DISCONNECT\r\n");
-    AT_Send("AT+EXIT\r\n");
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
 }
 /*************************************************************
-Function Name       : Search_List
-Function Description: search the specified device
+Function Name       : Master_msg_preproc
+Function Description: Master msg preprocess
 Param_in            : 
 Param_out           : 
 Return Type         : 
-Note                : 
+Note                : format 1(0) xx:xx xx:xx xx:xx
 Author              : Yan
 Time                : 2021-01-28
 *************************************************************/
-void Search_List(void)
+void Master_msg_preproc(void)
 {
-    for (uint8_t i = 0; i < 17; i++)//storage the master addr
-    {
-        addr_string_m[i] = USART1_RX_buf[i+2];
-    }
-    for (uint8_t i = 0; i < 20; i++)//storage the addr of target
-    {
-        addr_string_t[i] = USART1_RX_buf[i+22];
-    }
     USART1_SendWord("y");
     delay_ms_1(20);
-    AT_Send("+++");
-    AT_Send("AT+DISCONNECT\r\n");
-    delay_ms_1(100);
-    USART1_RX_STA = 0;
-    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-    AT_Get_State("DEV_DEL=");
-    AT_Send("AT+EXIT\r\n");
-    uint8_t pos;
-    //detect flag
-    if (0 == (pos = strStr_2(USART1_STA_buf, addr_string_t)))//not bound
+    uint8_t t = USART1_RX_STA & 0x7fff;
+    t -= 6;
+    if (8 == t)
     {
-        myflag.SPEC_flag = 0;//n
-        if (0 == (pos = strStr_2(USART1_STA_buf, addr_string_m)))//not repeat
-        {
-            myflag.REPEAT_flag = 1;//n
-        }
-        else
-        {
-            myflag.REPEAT_flag = 0;//y
-        }
+        myflag.HOP_STA_flag = 1;//end
+        return;
     }
     else
-    {
-        myflag.SPEC_flag = 1;//y
-    }
-    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+        myflag.HOP_STA_flag = 0;//hop
+    
 }
 /*************************************************************
 Function Name       : Transmitts_msg_process
@@ -437,14 +449,14 @@ Time                : 2021-01-29
 *************************************************************/
 void Transmitts_msg_process(void)
 {
-    if (myflag.SPEC_flag)
+    if (myflag.HOP_STA_flag)
         FSM_EventHandler(&system_FSM, S_EVE_TS1);
     else
         FSM_EventHandler(&system_FSM, S_EVE_TS2);
 }
 /*************************************************************
-Function Name       : Link_One
-Function Description: link to the specified one
+Function Name       : Link_End
+Function Description: link to the ended one
 Param_in            : 
 Param_out           : 
 Return Type         : 
@@ -452,8 +464,22 @@ Note                :
 Author              : Yan
 Time                : 2021-01-28
 *************************************************************/
-void Link_One(void)
+void Link_End(void)
 {
+    uint8_t t = USART1_RX_STA & 0x7fff;
+    uint8_t *m_string = (uint8_t *)malloc(t);
+    uint8_t i = 0;
+    while (t--)
+    {
+        m_string[i] = USART1_RX_buf[i];
+        i++;
+    }
+    AT_Send("+++");
+    AT_Get_Cnt_List();
+    AT_Send("AT+EXIT\r\n");
+
+    memset(m_string, 0, sizeof(m_string));
+    free(m_string);
     uint8_t addr_string[] = "00000000000000000\r\n";
     for (uint8_t i = 0; i < 17; i++)
     {
@@ -491,8 +517,8 @@ void Link_One(void)
     }
 }
 /*************************************************************
-Function Name       : Link_All
-Function Description: link to all bound devices, , except for the repeated one
+Function Name       : Link_Hop
+Function Description: hop msg to next device
 Param_in            : 
 Param_out           : 
 Return Type         : 
@@ -500,7 +526,7 @@ Note                :
 Author              : Yan
 Time                : 2021-01-28
 *************************************************************/
-void Link_All(void)
+void Link_Hop(void)
 {
     if (myflag.REPEAT_flag)//no repeat
     {

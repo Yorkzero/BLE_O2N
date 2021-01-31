@@ -25,7 +25,7 @@ typedef struct sysFlag
   uint8_t INIT_STA_flag:1;//initialization state flag 0:not initialized yet, 1:initialized ready
   uint8_t MAC_NUM_flag:2;//used to record the number of bound mac addresses, x=0, 1, 2, 3
   uint8_t LINK_STA_flag:1;//used to enter status of msg exc 0:not ready, 1:ready
-  uint8_t SPEC_flag:1;//Determine whether there is a specified device 0:n, 1:y
+  uint8_t HOP_STA_flag:1;//Determine whether to send hop msg or ending control msg 0:hop, 1:end
 }myFlag;
 extern volatile myFlag myflag;
 /*-------------------- Type Declarations -------------------*/
