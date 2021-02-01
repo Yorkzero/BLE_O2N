@@ -16,8 +16,7 @@ Date     : 2021-01-28
 #include "main.h"
 
 /*----------- Global Definitions and Declarations ----------*/
-extern uint8_t addr_string_t[];//used to store the addr of target
-extern uint8_t addr_string_m[];//used to store the master addr
+
 /*-------------------- Type Declarations -------------------*/
 typedef uint8_t State;
 typedef uint8_t Event;
@@ -183,36 +182,25 @@ void Mesh_wfm(void);
 /*************************************************************
 Function Name       : Mesh_success
 Function Description: Send networking success command to the host
-Param_in            : 
+Param_in            : uint8_t *string_m
 Param_out           : 
 Return Type         : 
 Note                : 
 Author              : Yan
 Time                : 2021-01-30
 *************************************************************/
-void Mesh_success(void);
+void Mesh_success(uint8_t *string_m);
 /*************************************************************
 Function Name       : Motor_Run
 Function Description: control the motor of the device
-Param_in            : uint8_t *string_m
+Param_in            : 
 Param_out           : 
 Return Type         : 
 Note                : 
 Author              : Yan
 Time                : 2021-01-28
 *************************************************************/
-void Motor_Run(uint8_t *string_m);
-/*************************************************************
-Function Name       : Master_msg_preproc
-Function Description: Master msg preprocess
-Param_in            : 
-Param_out           : 
-Return Type         : 
-Note                : format 1(0) xx:xx xx:xx xx:xx
-Author              : Yan
-Time                : 2021-01-28
-*************************************************************/
-void Master_msg_preproc(void);
+void Motor_Run(void);
 /*************************************************************
 Function Name       : Transmitts_msg_process
 Function Description: determine to send which kind of msg

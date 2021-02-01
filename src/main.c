@@ -57,10 +57,16 @@ int main(void)
     BLE_SEND_ENABLE();
     delay_ms_1(500);
     FSM_Init(&system_FSM, sys_table, S_STA_INIT);
+    PWR_FastWakeUpCmd(DISABLE);
+    PWR_UltraLowPowerCmd(ENABLE);
     // BLE_Init();
     while(1)
     {
-        // halt();
+        // AT_Send("+++");
+        // AT_Send("AT+SLEEP=1,0\r\n");
+        // AT_Send("AT+EXIT\r\n");
+        // BLE_SEND_DISABLE();
+        // Sleep_Handler();
         // BLE_status_run();
         // request_msg_process();
         FSM_Run();

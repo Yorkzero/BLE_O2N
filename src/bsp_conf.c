@@ -50,7 +50,7 @@ void bsp_gpio_init(void)
     //Initialization of all used pin, change the mode if needed.
     GPIO_Init(LEDG_PORT, LEDG_PIN, GPIO_Mode_Out_PP_Low_Slow);        //Green led init
     GPIO_Init(LEDR_PORT, LEDR_PIN, GPIO_Mode_Out_PP_Low_Slow);        //Red led init
-    GPIO_Init(LOWV_PORT, LOWV_PIN, GPIO_Mode_In_FL_No_IT);            //Low pwr detection, opening interrupt when used.
+    GPIO_Init(LOWV_PORT, LOWV_PIN, GPIO_Mode_In_PU_No_IT);            //Low pwr detection, opening interrupt when used.
     GPIO_Init(KEY_PORT, KEY_PIN, GPIO_Mode_In_PU_No_IT);              //key detection, opening interrupt when used.
     GPIO_Init(BLE_CTS_PORT, BLE_CTS_PIN, GPIO_Mode_In_PU_No_IT);        //ble CTS state/active low
     GPIO_Init(BLE_RTS_PORT, BLE_RTS_PIN, GPIO_Mode_Out_PP_High_Slow);    //ble RTS state/active low
@@ -647,6 +647,7 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
                             last_cnt++;
                         }
                         AT_Send("AT+S_NAME=0\r\n");
+                        AT_Send("AT+STATUS=1\r\n");
                         AT_Send((uint8_t *)(connect2("AT+CONNECT=,", mac_addr)));
                         for (uint8_t i = 0; i < 100; i++)//delay 1s
                         {
@@ -668,29 +669,22 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
                                 AT_Send("AT+TTM_ROLE=1\r\n");
                                 AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
                                 AT_Send("AT+EXIT\r\n");//exit AT mode
-                                if (0 == (BLE_Send("pairing request")))
-                                {
-                                    flag += 1;
-                                    AT_Send("+++");
-                                    AT_Get_State("MAC");
-                                    AT_Send("AT+EXIT\r\n");
-                                    BLE_Send((uint8_t *)connect2("1 ", sta_buf_ptr));
-                                    // BLE_Send("en");
-                                    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-                                    AT_Send("+++");
-                                    
-                                    AT_Send("AT+S_NAME=1\r\n");
-                                    break;
-                                }
-                                else
-                                {
-                                    AT_Send("+++");
-                                    AT_Send((uint8_t *)connect2("AT+DISCONNECT=2,", a));
-                                    AT_Send("AT+S_NAME=1\r\n");
-                                    break;
-                                }
+                                BLE_Send("pairing request");
+                                flag += 1;
+                                AT_Send("+++");
+                                AT_Get_State("MAC");
+                                AT_Send("AT+EXIT\r\n");
+                                BLE_Send((uint8_t *)connect2("1 ", sta_buf_ptr));
+                                // BLE_Send("en");
+                                memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+                                AT_Send("+++");
+                                AT_Send("AT+STATUS=0\r\n");
+                                AT_Send("AT+S_NAME=1\r\n");
+                                break;
+                                
                             }
                         }
+                        AT_Send("AT+STATUS=0\r\n");
                         
                     }
                     if (t == (cur_cnt + 1))//the end

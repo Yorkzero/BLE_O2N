@@ -111,7 +111,7 @@ uint8_t BLE_Send(uint8_t *atcmd)
             USART1_SendWord(atcmd);
             delay_ms_1(2);
         }
-        for (t = 0; t < 100; t++)//delay 500ms
+        for (t = 0; t < 200; t++)//delay 1s
         {
             if(USART1_RX_STA & 0x8000)
                 break;
@@ -417,7 +417,7 @@ void BLE_Init(void)
     BLE_Name_Change(DISABLE);
     AT_Send("+++");//enter AT mode
     AT_Send("AT+ROLE=2\r\n");//set the role: slave and master
-    AT_Send("AT+POWER=-10\r\n");//set the TX power as -30db
+    AT_Send("AT+POWER=-28\r\n");//set the TX power as -28db
     AT_Send("AT+PACK=200,5\r\n");//set the pack range and frame as 200byte and 5ms outtime
     AT_Send("AT+CNT_INTERVAL=240\r\n");//set the connect interval as (240 * 1.25 = 300)ms
     AT_Send("AT+ADS=1,1,50\r\n");//set the advertise interval as 50ms
@@ -455,7 +455,7 @@ uint8_t BLE_MESH(void)
         myflag.BLE_STA_flag = 0;
         flag = 0;
         AT_Send("AT+TTM_ROLE=0\r\n");
-        AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 0.5s
+        AT_Send("AT+ADS=0,1,500\r\n");//set the advertise interval as 0.5s
         AT_Get_State("MAC");
         AT_Send("AT+EXIT\r\n");
         uint8_t string_m[] = "m00:00 ";
@@ -465,8 +465,9 @@ uint8_t BLE_MESH(void)
         }
         memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
         USART1_SendWord(string_m);
-        delay_ms_1(20);
+        delay_ms_1(500);
         USART1_SendWord("done!");
+        FSM_Transfer(&system_FSM, S_STA_MESH_OK);
         return flag;
     }
     else
@@ -475,7 +476,7 @@ uint8_t BLE_MESH(void)
     }
     myflag.BLE_STA_flag = 0;
     flag = 0;
-    AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 0.5s
+    AT_Send("AT+ADS=0,1,500\r\n");//set the advertise interval as 0.5s
     AT_Send("AT+EXIT\r\n");
     return flag;
 }
@@ -491,7 +492,6 @@ Time                : 2021-01-19
 *************************************************************/
 uint8_t BLE_FINISH_MESH(uint8_t num)
 {
-    num -= 1;
     uint8_t flag = 1;
     AT_Get_Cnt_List();
     uint8_t *sta_ptr = USART1_STA_buf;
@@ -519,6 +519,7 @@ uint8_t BLE_FINISH_MESH(uint8_t num)
         AT_Send("AT+EXIT\r\n");
         BLE_Send("en");
         AT_Send("+++");
+        i++;
     }
     return flag;
 }

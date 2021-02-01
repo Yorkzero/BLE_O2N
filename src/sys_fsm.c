@@ -14,14 +14,11 @@ Date     : 2021-01-28
 #include "sys_fsm.h"
 
 /*----------- Global Definitions and Declarations ----------*/
-uint8_t addr_string_t[] = "00000000000000000000";//used to store the addr of target, format: xx:xx:xx:xx:xx:xx\r\n(1/0)
-uint8_t addr_string_m[] = "00000000000000000";//used to store the master addr, format: xx:xx:xx:xx:xx:xx
 FSM_table_t sys_table[]={
 /**/    /*cur_state     event           eventfunction       next_state*/
 /**/    {S_STA_INIT,    S_EVE_NOMESH,   Wait_for_mesh,      S_STA_MESH},
 /**/    {S_STA_HALT,    S_EVE_ITWU,     Halt_to_wait,       S_STA_WFM},
 /**/    {S_STA_WFM,     S_EVE_RS1,      Motor_Run,          S_STA_MOV},
-/**/    {S_STA_WFM,     S_EVE_RS2,      Master_msg_preproc, S_STA_DWM},
 /**/    {S_STA_DWM,     S_EVE_TS1,      Link_End,           S_STA_SPEC},
 /**/    {S_STA_DWM,     S_EVE_TS2,      Link_Hop,           S_STA_HOP},
 /**/    {S_STA_MOV,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
@@ -177,8 +174,9 @@ void Halt_to_wait(void)
 {
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    delay_ms_1(20);
     AT_Send("+++");
-    AT_Send("AT+TTM_ROLE=1\r\n");
+    AT_Send("AT+TTM_ROLE=0\r\n");
     AT_Send("AT+EXIT\r\n");
 }
 /*************************************************************
@@ -302,13 +300,11 @@ void Received_msg_process(void)
         if ((('1' == USART1_RX_buf[0]) || ('0' == USART1_RX_buf[0]))
              && (' ' == USART1_RX_buf[1]))
         {
-            FSM_EventHandler(&system_FSM, S_EVE_RS2);
+            FSM_Transfer(&system_FSM, S_STA_DWM);
         }
     }
     
     
-    USART1_RX_STA = 0;
-    memset(USART1_RX_buf,0,sizeof(USART1_RX_buf));
     
 }
 /*************************************************************
@@ -350,7 +346,6 @@ void Mesh_wfm(void)
             if ('d' == USART1_RX_buf[0])//slave msg done
             {
                 device_cnt--;
-                continue;
             }
             if ('m' == USART1_RX_buf[0])//slave msg
             {
@@ -360,8 +355,8 @@ void Mesh_wfm(void)
             USART1_RX_STA = 0;
         }
     }
-    USART1_SendWord("done!");//fininsh mesh msg send
-    
+    delay_ms_1(400);
+    USART1_SendWord("done!");//fininsh mesh msg send    
 }
 /*************************************************************
 Function Name       : Mesh_success
@@ -413,31 +408,6 @@ void Motor_Run(void)
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
 }
 /*************************************************************
-Function Name       : Master_msg_preproc
-Function Description: Master msg preprocess
-Param_in            : 
-Param_out           : 
-Return Type         : 
-Note                : format 1(0) xx:xx xx:xx xx:xx
-Author              : Yan
-Time                : 2021-01-28
-*************************************************************/
-void Master_msg_preproc(void)
-{
-    USART1_SendWord("y");
-    delay_ms_1(20);
-    uint8_t t = USART1_RX_STA & 0x7fff;
-    t -= 6;
-    if (8 == t)
-    {
-        myflag.HOP_STA_flag = 1;//end
-        return;
-    }
-    else
-        myflag.HOP_STA_flag = 0;//hop
-    
-}
-/*************************************************************
 Function Name       : Transmitts_msg_process
 Function Description: determine to send which kind of msg
 Param_in            : 
@@ -449,6 +419,13 @@ Time                : 2021-01-29
 *************************************************************/
 void Transmitts_msg_process(void)
 {
+    uint8_t t = USART1_RX_STA & 0x7fff;
+    t -= 6;
+    if (8 == t)
+        myflag.HOP_STA_flag = 1;//end
+    else
+        myflag.HOP_STA_flag = 0;//hop
+
     if (myflag.HOP_STA_flag)
         FSM_EventHandler(&system_FSM, S_EVE_TS1);
     else
@@ -467,8 +444,9 @@ Time                : 2021-01-28
 void Link_End(void)
 {
     uint8_t t = USART1_RX_STA & 0x7fff;
-    uint8_t *m_string = (uint8_t *)malloc(t);
+    uint8_t *m_string = (uint8_t *)malloc(t-6);
     uint8_t i = 0;
+    t -= 6;
     while (t--)
     {
         m_string[i] = USART1_RX_buf[i];
@@ -476,45 +454,28 @@ void Link_End(void)
     }
     AT_Send("+++");
     AT_Get_Cnt_List();
+    AT_Send("AT+TTM_ROLE=1\r\n");
     AT_Send("AT+EXIT\r\n");
-
+    uint8_t t_string[5];
+    for (uint8_t i = 0; i < 5; i++)
+    {
+        t_string[i] = m_string[i+2];
+    }
+    uint8_t handler = strStr_2(USART1_STA_buf, t_string) - 16;
+    uint8_t a[] = "1\r\n";
+    a[0] = USART1_STA_buf[handler];
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+    AT_Send("+++");
+    AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
+    AT_Send("AT+EXIT\r\n");//exit AT mode
+    if ('1' == m_string[0])//open door
+        BLE_Send("u 1");
+    else
+        BLE_Send("u 0");
+    USART1_RX_STA = 0;
+    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     memset(m_string, 0, sizeof(m_string));
     free(m_string);
-    uint8_t addr_string[] = "00000000000000000\r\n";
-    for (uint8_t i = 0; i < 17; i++)
-    {
-        addr_string[i] = addr_string_t[i];
-    }
-    AT_Send("+++");
-    AT_Send((uint8_t *)connect2("AT+CONNECT=,", addr_string));
-    for (uint8_t i = 0; i < 100; i++)//delay 1s
-    {
-        delay_ms_1(10);
-        if(USART1_RX_STA & 0x8000)
-            break;
-    }
-    if ((USART1_RX_STA & 0x8000))
-    {
-        uint8_t t = USART1_RX_STA & 0x7FFF;//get the length of data
-        USART1_RX_STA = 0;
-        if ('C' == USART1_RX_buf[t-6])//successfully connected
-        {
-            AT_Send("AT+TTM_ROLE=1\r\n");
-            AT_Send("AT+EXIT\r\n");
-            if ('1' == addr_string_t[19])//open door
-                BLE_Send("u 1");
-            else
-                BLE_Send("u 0");
-            for (uint8_t i = 0; i < 100; i++)//delay 1s
-            {
-                delay_ms_1(10);
-                if(USART1_RX_STA & 0x8000)
-                    break;
-            }
-            USART1_RX_STA = 0;
-            memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-        }
-    }
 }
 /*************************************************************
 Function Name       : Link_Hop
@@ -528,106 +489,47 @@ Time                : 2021-01-28
 *************************************************************/
 void Link_Hop(void)
 {
-    if (myflag.REPEAT_flag)//no repeat
+    uint8_t t = USART1_RX_STA & 0x7fff;
+    uint8_t *m_string = (uint8_t *)malloc(t-6);
+    uint8_t i = 0;
+    t -= 6;
+    while (t--)
     {
-        uint8_t i = myflag.MAC_NUM_flag;
-        AT_Send("+++");
-        AT_Send("AT+AUTO_CNT=1\r\n");
-        AT_Send("AT+SLEEP=,0\r\n");
-        AT_Send("AT+SLEEP=,1\r\n");
-        while (i--)
-        {
-            for (uint8_t i = 0; i < 100; i++)//delay 1s
-            {
-                if(USART1_RX_STA & 0x8000)
-                {
-                    USART1_RX_STA = 0;
-                    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-                    break;
-                }                    
-                delay_ms_1(10);                
-            }
-        }
-        AT_Send("AT+TTM_ROLE=1\r\n");
-        i = myflag.MAC_NUM_flag;
-        AT_Get_State("MAC");
-        for (uint8_t k = 0; k < 17; k++)//refresh master addr
-        {
-            addr_string_m[k] = USART1_STA_buf[k];
-        }
-        memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-        uint8_t trans_msg[] = "m 00000000000000000 t 00000000000000000\r\n0";
-        for (uint8_t k = 0; k < 17; k++)
-        {
-            trans_msg[k+2] = addr_string_m[k];
-            trans_msg[k+22] = addr_string_t[k];
-        }
-        trans_msg[41] = addr_string_t[19];
-        uint8_t handle[] = "0\r\n";
-        while (i--)
-        {
-            handle[0] += 1;
-            AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=",handle));
-            AT_Send("AT+EXIT\r\n");
-            BLE_Send(trans_msg);
-            AT_Send("+++");
-        }
-        AT_Send("AT+DISCONNECT\r\n");
-        AT_Send("AT+EXIT\r\n");
+        m_string[i] = USART1_RX_buf[i];
+        i++;
     }
-    else//repeat
-    {
-        uint8_t i = myflag.MAC_NUM_flag - 1;
-        AT_Send("+++");       
-        uint8_t addr_string[] = "00000000000000000\r\n";
-        for (uint8_t i = 0; i < 17; i++)
-        {   
-            addr_string[i] = addr_string_m[i];
+    AT_Send("+++");
+    AT_Get_Cnt_List();
+    AT_Send("AT+TTM_ROLE=1\r\n");
+    AT_Send("AT+EXIT\r\n");
+    if (1 == myflag.MAC_NUM_flag)
+        t = 22;
+    if (2 == myflag.MAC_NUM_flag)
+        t = 44;
+    uint8_t handler;
+    for(uint8_t n=0;n<t;n++){
+        uint8_t j=0;
+        uint8_t k=n;
+        while(USART1_STA_buf[k]==m_string[i - 6 + j] && j<5){
+            k++;
+            j++;
+            if(USART1_STA_buf[k]!=m_string[i - 6 + j] && j<5){
+                break;
+            }    
         }
-        AT_Send("AT+AUTO_CNT=1\r\n");
-        AT_Send((uint8_t *)connect2("AT+AUTO_CNT=0,", addr_string));
-        AT_Send("AT+SLEEP=,0\r\n");
-        AT_Send("AT+SLEEP=,1\r\n");
-        while (i--)
-        {
-            for (uint8_t i = 0; i < 100; i++)//delay 1s
-            {
-                if(USART1_RX_STA & 0x8000)
-                {
-                    USART1_RX_STA = 0;
-                    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-                    break;
-                }                    
-                delay_ms_1(10);                
+        if(j==5){
+                handler = n - 15;
             }
-        }
-        AT_Send("AT+TTM_ROLE=1\r\n");
-        i = myflag.MAC_NUM_flag - 1;
-        AT_Get_State("MAC");
-        for (uint8_t k = 0; k < 17; k++)//refresh master addr
-        {
-            addr_string_m[k] = USART1_STA_buf[k];
-        }
-        memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-        uint8_t trans_msg[] = "m 00000000000000000 t 00000000000000000\r\n0";
-        for (uint8_t k = 0; k < 17; k++)
-        {
-            trans_msg[k+2] = addr_string_m[k];
-            trans_msg[k+22] = addr_string_t[k];
-        }
-        trans_msg[41] = addr_string_t[19];
-        uint8_t handle[] = "0\r\n";
-        while (i--)
-        {
-            handle[0] += 1;
-            AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=",handle));
-            AT_Send("AT+EXIT\r\n");
-            BLE_Send(trans_msg);
-            AT_Send("+++");
-        }
-        AT_Send("AT+DISCONNECT\r\n");
-        AT_Send("AT+EXIT\r\n");
     }
+    uint8_t a[] = "1\r\n";
+    a[0] = USART1_STA_buf[handler];
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+    AT_Send("+++");
+    AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
+    AT_Send("AT+EXIT\r\n");//exit AT mode
+    BLE_Send(m_string);//hop msg
+    memset(m_string, 0, sizeof(m_string));
+    free(m_string);
 }
 /*------------------- Function Implement -------------------*/
 
