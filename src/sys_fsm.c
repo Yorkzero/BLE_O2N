@@ -15,7 +15,7 @@ Date     : 2021-01-28
 
 /*----------- Global Definitions and Declarations ----------*/
 FSM_table_t sys_table[]={
-/**/    /*cur_state     event           eventfunction       next_state*/
+/**/    /*cur_state     event           event_function      next_state*/
 /**/    {S_STA_INIT,    S_EVE_NOMESH,   Wait_for_mesh,      S_STA_MESH},
 /**/    {S_STA_HALT,    S_EVE_ITWU,     Halt_to_wait,       S_STA_WFM},
 /**/    {S_STA_WFM,     S_EVE_RS1,      Motor_Run,          S_STA_MOV},
@@ -260,12 +260,16 @@ Time                : 2021-01-28
 *************************************************************/
 void Sleep_Handler(void)
 {
+    AT_Send("+++");
+    AT_Send("AT+SLEEP=0,1\r\n");
+    AT_Send("AT+EXIT\r\n");
     USART_Cmd(USART1, DISABLE);
-    GPIO_Init(UART_RX_PORT, UART_RX_PIN, GPIO_Mode_In_PU_IT);
+    GPIO_Init(BLE_CTS_PORT, BLE_CTS_PIN, GPIO_Mode_In_PU_IT);
     CLK_PeripheralClockConfig(CLK_Peripheral_USART1, DISABLE);
     // CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM3, DISABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM4,DISABLE);
+    BLE_SEND_DISABLE();
     halt();
 }
 /*************************************************************
@@ -339,7 +343,7 @@ void Mesh_wfm(void)
         {
             if (USART1_RX_STA & 0x8000)
                 break;
-            delay_ms_1(5);
+            delay_ms_1(1);
         }
         if (USART1_RX_STA & 0x8000)
         {
@@ -357,6 +361,7 @@ void Mesh_wfm(void)
     }
     delay_ms_1(400);
     USART1_SendWord("done!");//fininsh mesh msg send    
+    delay_ms_1(20);
 }
 /*************************************************************
 Function Name       : Mesh_success
@@ -394,8 +399,6 @@ Time                : 2021-01-28
 *************************************************************/
 void Motor_Run(void)
 {
-    USART1_SendWord("y");
-    delay_ms_1(10);
     if ('1' == USART1_RX_buf[2])//open door
     {
         ble_lock(DISABLE);

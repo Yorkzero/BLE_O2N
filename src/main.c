@@ -54,8 +54,13 @@ int main(void)
     //init buff
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     USART1_RX_STA = 0;
+    BLE_SEND_DISABLE();
+    delay_ms_1(30);
     BLE_SEND_ENABLE();
     delay_ms_1(500);
+    AT_Send("+++");
+    AT_Send("AT+SLEEP=1,1\r\n");
+    AT_Send("AT+EXIT\r\n");
     FSM_Init(&system_FSM, sys_table, S_STA_INIT);
     PWR_FastWakeUpCmd(DISABLE);
     PWR_UltraLowPowerCmd(ENABLE);
@@ -63,7 +68,7 @@ int main(void)
     while(1)
     {
         // AT_Send("+++");
-        // AT_Send("AT+SLEEP=1,0\r\n");
+        // AT_Send("AT+SLEEP=0,1\r\n");
         // AT_Send("AT+EXIT\r\n");
         // BLE_SEND_DISABLE();
         // Sleep_Handler();

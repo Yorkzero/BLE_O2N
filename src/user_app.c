@@ -407,13 +407,14 @@ void BLE_Init(void)
 {
     // if (1 == myflag.INIT_STA_flag)//avoid init again
     //     return;
-    GPIO_Init(UART_RX_PORT, UART_RX_PIN, GPIO_Mode_In_PU_No_IT);      //UART receive init
+    GPIO_Init(BLE_CTS_PORT, BLE_CTS_PIN, GPIO_Mode_In_PU_No_IT);      //UART receive init
     CLK_PeripheralClockConfig(CLK_Peripheral_USART1, ENABLE);
     // CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, ENABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM3, ENABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM4,ENABLE);
+    BLE_SEND_ENABLE();
     USART_Cmd(USART1, ENABLE);
-    EXTI_ClearITPendingBit(EXTI_IT_Pin2);
+    EXTI_ClearITPendingBit(EXTI_IT_Pin1);
     BLE_Name_Change(DISABLE);
     AT_Send("+++");//enter AT mode
     AT_Send("AT+ROLE=2\r\n");//set the role: slave and master
@@ -455,6 +456,7 @@ uint8_t BLE_MESH(void)
         myflag.BLE_STA_flag = 0;
         flag = 0;
         AT_Send("AT+TTM_ROLE=0\r\n");
+        AT_Send("AT+CNT_INTERVAL=480\r\n");//set the connect interval as (480 * 1.25 = 600)ms
         AT_Send("AT+ADS=0,1,500\r\n");//set the advertise interval as 0.5s
         AT_Get_State("MAC");
         AT_Send("AT+EXIT\r\n");
@@ -476,6 +478,7 @@ uint8_t BLE_MESH(void)
     }
     myflag.BLE_STA_flag = 0;
     flag = 0;
+    AT_Send("AT+CNT_INTERVAL=480\r\n");//set the connect interval as (480 * 1.25 = 600)ms
     AT_Send("AT+ADS=0,1,500\r\n");//set the advertise interval as 0.5s
     AT_Send("AT+EXIT\r\n");
     return flag;
@@ -542,6 +545,7 @@ void ble_lock(FunctionalState Newstate)
         MOTO_FW();
         delay_10ms_rtc(25);
         MOTO_WT();
+        MOTO_BR();
         myflag.LOCK_STA_flag = 0;//change the flag
     }
     else if ((DISABLE == Newstate) && (0 == myflag.LOCK_STA_flag))//open the door
@@ -549,6 +553,7 @@ void ble_lock(FunctionalState Newstate)
         MOTO_BW();
         delay_10ms_rtc(25);
         MOTO_WT();
+        MOTO_BR();
         myflag.LOCK_STA_flag = 1;//change the flag
     }
     

@@ -199,6 +199,17 @@ Time                : 2020-12-26
 *************************************************************/
 void mode_IRQHandler(void);
 /*************************************************************
+Function Name       : flowc_IRQHandler
+Function Description: data flow controller in HALT mode
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-02-02
+*************************************************************/
+void flowc_IRQHandler(void);
+/*************************************************************
 Function Name       : bsp_rtc_IRQHandler
 Function Description: rtc IT function
 Param_in            : 

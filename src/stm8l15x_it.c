@@ -179,6 +179,7 @@ INTERRUPT_HANDLER(EXTI1_IRQHandler, 9)
   /* In order to detect unexpected events during development,
      it is recommended to set a breakpoint on the following instruction.
   */
+  flowc_IRQHandler();
 }
 
 /**

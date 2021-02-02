@@ -61,10 +61,12 @@ void bsp_gpio_init(void)
     GPIO_Init(MOTOB_PORT, MOTOB_PIN, GPIO_Mode_Out_PP_Low_Slow);      //motor B init
     //Initialization of EXIT
     EXTI_SetPinSensitivity(KEY_EXTI_PIN, EXTI_Trigger_Falling); //key trigger falling
-    EXTI_SetPinSensitivity(EXTI_Pin_2, EXTI_Trigger_Falling); //ble trigger falling
+    EXTI_SetPinSensitivity(EXTI_Pin_2, EXTI_Trigger_Falling); //usart trigger falling
+    EXTI_SetPinSensitivity(EXTI_Pin_1, EXTI_Trigger_Rising_Falling);//cts trogger rising and falling
     //IT Priority
-    ITC_SetSoftwarePriority(EXTI4_IRQn,ITC_PriorityLevel_1); //key 1
-    ITC_SetSoftwarePriority(EXTI2_IRQn,ITC_PriorityLevel_1); //key 1
+    ITC_SetSoftwarePriority(EXTI4_IRQn,ITC_PriorityLevel_1); //PB4
+    ITC_SetSoftwarePriority(EXTI2_IRQn,ITC_PriorityLevel_1); //PC2
+    ITC_SetSoftwarePriority(EXTI2_IRQn,ITC_PriorityLevel_1); //PD1
     //Set unused pin mode: IN_PU_NO_IT
     GPIO_Init(GPIOA, PA_UNUSED_PIN, GPIO_Mode_In_PU_No_IT);
     GPIO_Init(GPIOB, PB_UNUSED_PIN, GPIO_Mode_In_PU_No_IT);
@@ -503,6 +505,28 @@ void mode_IRQHandler(void)
     
     USART_Cmd(USART1, ENABLE);
     EXTI_ClearITPendingBit(EXTI_IT_Pin2);
+}
+/*************************************************************
+Function Name       : flowc_IRQHandler
+Function Description: data flow controller in HALT mode
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-02-02
+*************************************************************/
+void flowc_IRQHandler(void)
+{
+    GPIO_Init(BLE_CTS_PORT, BLE_CTS_PIN, GPIO_Mode_In_PU_No_IT);
+    CLK_PeripheralClockConfig(CLK_Peripheral_USART1, ENABLE);
+    // CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, ENABLE);
+    CLK_PeripheralClockConfig(CLK_Peripheral_TIM3, ENABLE);
+    CLK_PeripheralClockConfig(CLK_Peripheral_TIM4,ENABLE);
+    USART_Cmd(USART1, ENABLE);
+    BLE_SEND_ENABLE();
+    delay_ms_1(100);
+    EXTI_ClearITPendingBit(EXTI_IT_Pin1);
 }
 /*************************************************************
 Function Name       : bsp_rtc_IRQHandler
