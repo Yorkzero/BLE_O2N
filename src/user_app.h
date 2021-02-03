@@ -56,6 +56,17 @@ Time                : 2020-11-27
 *************************************************************/
 uint8_t BLE_Send(uint8_t *atcmd);
 /*************************************************************
+Function Name       : BLE_Send2
+Function Description: send BLE cmd(600ms re-send)
+Param_in            : uint8_t *atcmd
+Param_out           : 
+Return Type         : u16 tag
+Note                : 0: succeed/1: failed
+Author              : Yan
+Time                : 2021-2-3
+*************************************************************/
+uint8_t BLE_Send2(uint8_t *atcmd);
+/*************************************************************
 Function Name       : AT_Get_State
 Function Description: use AT to get BLE state
 Param_in            : char *sta

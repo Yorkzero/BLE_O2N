@@ -23,6 +23,7 @@ uint8_t USART1_STA_buf[USART1_STA_MAX_LEN];//USART1 state buffer
 
 /*------------------ Variable Declarations -----------------*/
 volatile uint8_t key_flag = 0;       //key state flag
+volatile uint8_t step = 0;           //step
 volatile uint32_t beep_play_time = 0; //record the beep play time
 /**
  * @brief define the receive state of usart1 
@@ -126,7 +127,7 @@ void bsp_key_detec(void)
         TIM2_Cmd(ENABLE);
         while(!KEY_READ());
         TIM2_Cmd(DISABLE);
-        CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE); //enable the clk
+        CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE); //DISable the clk
     }
     if (30 > key_flag)//short press
     {
@@ -626,9 +627,10 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
     AT_Send("AT+S_NAME=1\r\n");//start scan
     while (retry--)
     {
-        if (2 == flag)
+        if ((2 == flag) || (4 == key_flag))
         {
             AT_Send("AT+S_NAME=0\r\n");//stop scaN
+            key_flag = 0;
             break;
         }
             
@@ -695,12 +697,9 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
                                 AT_Send("AT+EXIT\r\n");//exit AT mode
                                 BLE_Send("pairing request");
                                 flag += 1;
-                                AT_Send("+++");
-                                AT_Get_State("MAC");
-                                AT_Send("AT+EXIT\r\n");
-                                BLE_Send((uint8_t *)connect2("1 ", sta_buf_ptr));
-                                // BLE_Send("en");
-                                memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+                                uint8_t layer_num[] = "l0";
+                                layer_num[1] += key_flag;
+                                BLE_Send(layer_num);
                                 AT_Send("+++");
                                 AT_Send("AT+STATUS=0\r\n");
                                 AT_Send("AT+S_NAME=1\r\n");
@@ -746,7 +745,6 @@ Time                : 2021-01-26
 *************************************************************/
 void request_msg_process(void)
 {
-    
     if ((USART1_RX_STA & 0x8000) && !myflag.LINK_STA_flag)//not linked yet
     {
         uint8_t t = USART1_RX_STA & 0x7fff;//get packet length
@@ -765,27 +763,27 @@ void request_msg_process(void)
         {
             myflag.LINK_STA_flag = 0;//stop linked flag
         }    
-        if (('p' == USART1_RX_buf[0]) && ('a' == USART1_RX_buf[1]))//be connected
+        if (('p' == USART1_RX_buf[0]) && ('a' == USART1_RX_buf[1]) && !step)//be connected
         {
             BLE_Name_Change(ENABLE);
             AT_Send("+++");
             AT_Send("AT+TTM_ROLE=0\r\n");
             AT_Send("AT+EXIT\r\n");
             USART1_SendWord("y");
+            step = 1;
         }
-        if (('1' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))//msg format£º1 xx:xx:xx:xx:xx:xx\r\n
+        if (('l' == USART1_RX_buf[0]) && (1 == step))//layer ID
         {
-            for (uint8_t i = 0; i < 19; i++)
-            {
-                USART1_STA_buf[i] = USART1_RX_buf[i+2];
-            }
+            key_flag = USART1_RX_buf[1] - '0' + 1;
             USART1_SendWord("y");
+            step = 2;
         }
-        if (('e' == USART1_RX_buf[0]) && ('n' == USART1_RX_buf[1]))//en mesh
+        if (('e' == USART1_RX_buf[0]) && ('n' == USART1_RX_buf[1]) && (2 == step))//en mesh
         {
             USART1_SendWord("y");
             delay_ms_1(20);
             BLE_MESH();
+            step = 0;
         }    
         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     }

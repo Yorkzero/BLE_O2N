@@ -14,6 +14,7 @@ Date     : 2021-01-28
 #include "sys_fsm.h"
 
 /*----------- Global Definitions and Declarations ----------*/
+//When adding or deleting this table, the size of the state machine must be modified synchronously
 FSM_table_t sys_table[]={
 /**/    /*cur_state     event           event_function      next_state*/
 /**/    {S_STA_INIT,    S_EVE_NOMESH,   Wait_for_mesh,      S_STA_MESH},
@@ -22,6 +23,7 @@ FSM_table_t sys_table[]={
 /**/    {S_STA_DWM,     S_EVE_TS1,      Link_End,           S_STA_SPEC},
 /**/    {S_STA_DWM,     S_EVE_TS2,      Link_Hop,           S_STA_HOP},
 /**/    {S_STA_MOV,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_WFM,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
 /**/    {S_STA_SPEC,    S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
 /**/    {S_STA_HOP,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
 /**/    {S_STA_INIT,    S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
@@ -113,7 +115,7 @@ void FSM_Init(FSM_t *pFSM, FSM_table_t *pSYS_table, State initState)
 {
     FSM_Register(pFSM, pSYS_table);
     FSM_Transfer(pFSM, initState);
-    pFSM->size = 11;
+    pFSM->size = 12;
 }
 /*************************************************************
 Function Name       : FSM_Run
@@ -261,6 +263,7 @@ Time                : 2021-01-28
 void Sleep_Handler(void)
 {
     AT_Send("+++");
+    AT_Send("AT+AUTO_CNT=1\r\n");
     AT_Send("AT+SLEEP=0,1\r\n");
     AT_Send("AT+EXIT\r\n");
     USART_Cmd(USART1, DISABLE);
@@ -284,7 +287,27 @@ Time                : 2021-01-28
 *************************************************************/
 void Received_msg_process(void)
 {
-    wfi();
+    bsp_tim2_init(12500);//set 100ms outtime
+    TIM2_Cmd(ENABLE);
+    while (50 >= key_flag)//set 5s outtime
+    {
+        wfi();
+        if (USART1_RX_STA)
+        {
+            key_flag = 0;
+            TIM2_Cmd(DISABLE);
+            CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE); //disable the clk
+            break;
+        }
+    }
+    if (50 < key_flag)//outtime
+    {
+        TIM2_Cmd(DISABLE);
+        CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE); //disable the clk
+        //check something
+        goto SLEEP;
+    }
+    
     // halt();
     for (uint8_t i = 0; i < 200; i++)
     {
@@ -295,21 +318,37 @@ void Received_msg_process(void)
     
     if (USART1_RX_STA & 0x8000)
     {
-        USART1_SendWord("y");
-        delay_ms_1(20);
+        uint8_t correct_temp = 0;
         if (('u' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))
         {
+            USART1_SendWord("y");
+            delay_ms_1(20);
+            correct_temp = 1;
             FSM_EventHandler(&system_FSM, S_EVE_RS1);
         }
         if ((('1' == USART1_RX_buf[0]) || ('0' == USART1_RX_buf[0]))
              && (' ' == USART1_RX_buf[1]))
         {
+            USART1_SendWord("y");
+            delay_ms_1(20);
+            correct_temp = 1;
             FSM_Transfer(&system_FSM, S_STA_DWM);
         }
+        if (!correct_temp)//incorrect msg
+        {
+            USART1_SendWord("n");
+            delay_ms_1(20);
+            USART1_RX_STA = 0;
+            memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+            key_flag = 60;//sleep
+        }
     }
-    
-    
-    
+    SLEEP:
+        if (50 < key_flag)//outtime
+        {
+            key_flag = 0;
+            FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
+        }
 }
 /*************************************************************
 Function Name       : Mesh_wfm
@@ -347,40 +386,51 @@ void Mesh_wfm(void)
         }
         if (USART1_RX_STA & 0x8000)
         {
-            if ('d' == USART1_RX_buf[0])//slave msg done
+            uint8_t t = USART1_RX_STA & 0x7fff;
+            uint8_t cur_cnt = 0;
+            uint8_t last_cnt = 0;
+            while (t > cur_cnt)
             {
-                device_cnt--;
+                if ('m' == USART1_RX_buf[cur_cnt])//slave msg
+                {
+                    if ('d' == USART1_RX_buf[cur_cnt + 1])//slave msg done
+                    {
+                        device_cnt--;
+                        if (device_cnt)
+                            USART1_RX_buf[cur_cnt + 1] = ' ';
+                    }
+                    if (cur_cnt != last_cnt)
+                    {
+                        Mesh_success(string_m, (cur_cnt - last_cnt), last_cnt);
+                        last_cnt = cur_cnt;
+                    }
+                }
+                cur_cnt++;
             }
-            if ('m' == USART1_RX_buf[0])//slave msg
-            {
-                Mesh_success(string_m);
-            }
+            Mesh_success(string_m, (t - last_cnt), last_cnt);//send the last msg
             memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
             USART1_RX_STA = 0;
         }
-    }
-    delay_ms_1(400);
-    USART1_SendWord("done!");//fininsh mesh msg send    
+    } 
     delay_ms_1(20);
 }
 /*************************************************************
 Function Name       : Mesh_success
 Function Description: Send networking success command to the host
-Param_in            : uint8_t *string_m
+Param_in            : uint8_t *string_m  uint8_t length  uint8_t pos
 Param_out           : 
 Return Type         : 
 Note                : 
 Author              : Yan
 Time                : 2021-01-30
 *************************************************************/
-void Mesh_success(uint8_t *string_m)
+void Mesh_success(uint8_t *string_m, uint8_t length, uint8_t pos)
 {
-    uint8_t t = USART1_RX_STA & 0x7fff;
-    uint8_t *m_string = (uint8_t *)malloc(t);
+    uint8_t *m_string = (uint8_t *)malloc(length);
     uint8_t i = 0;
-    while (t--)
+    while (length--)
     {
-        m_string[i] = USART1_RX_buf[i];
+        m_string[i] = USART1_RX_buf[i + pos];
         i++;
     }
     USART1_SendWord((uint8_t*)connect2(m_string, string_m));
@@ -464,7 +514,25 @@ void Link_End(void)
     {
         t_string[i] = m_string[i+2];
     }
-    uint8_t handler = strStr_2(USART1_STA_buf, t_string) - 16;
+    if (1 == myflag.MAC_NUM_flag)
+        t = 22;
+    if (2 == myflag.MAC_NUM_flag)
+        t = 44;
+    uint8_t handler;
+    for(uint8_t n=0;n<t;n++){
+        uint8_t j=0;
+        uint8_t k=n;
+        while(USART1_STA_buf[k]==t_string[j] && j<5){
+            k++;
+            j++;
+            if(USART1_STA_buf[k]!=t_string[j] && j<5){
+                break;
+            }    
+        }
+        if(j==5){
+                handler = n - 15;
+            }
+    }
     uint8_t a[] = "1\r\n";
     a[0] = USART1_STA_buf[handler];
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
@@ -472,9 +540,9 @@ void Link_End(void)
     AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
     AT_Send("AT+EXIT\r\n");//exit AT mode
     if ('1' == m_string[0])//open door
-        BLE_Send("u 1");
+        BLE_Send2("u 1");
     else
-        BLE_Send("u 0");
+        BLE_Send2("u 0");
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     memset(m_string, 0, sizeof(m_string));
@@ -530,7 +598,7 @@ void Link_Hop(void)
     AT_Send("+++");
     AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
     AT_Send("AT+EXIT\r\n");//exit AT mode
-    BLE_Send(m_string);//hop msg
+    BLE_Send2(m_string);//hop msg
     memset(m_string, 0, sizeof(m_string));
     free(m_string);
 }

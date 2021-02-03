@@ -139,6 +139,57 @@ uint8_t BLE_Send(uint8_t *atcmd)
     return tag;
 }
 /*************************************************************
+Function Name       : BLE_Send2
+Function Description: send BLE cmd(600ms re-send)
+Param_in            : uint8_t *atcmd
+Param_out           : 
+Return Type         : u16 tag
+Note                : 0: succeed/1: failed
+Author              : Yan
+Time                : 2021-2-3
+*************************************************************/
+uint8_t BLE_Send2(uint8_t *atcmd)
+{
+    uint16_t tag = 1;
+    uint8_t t;
+    USART1_RX_STA = 0;
+    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    uint8_t retry = 10;//number of AT command sending attempts
+    while (retry--)
+    {
+        if (0 == BLE_CTS_READ())
+        {
+            USART1_SendWord(atcmd);
+            delay_ms_1(2);
+        }
+        for (t = 0; t < 200; t++)//delay 600ms
+        {
+            if(USART1_RX_STA & 0x8000)
+                break;
+            delay_ms_1(3);
+        }
+        if ((USART1_RX_STA & 0x8000))//receive the data
+        {
+            USART1_RX_STA = 0;//clear the state flag
+            if ('y' == USART1_RX_buf[0])//Successful handshake
+            {
+                tag = 0;
+                break;
+            }
+            else if ('n' == USART1_RX_buf[0])//falied handshake
+            {
+                tag = 1;
+                break;
+            }
+        }
+    }
+    //clear the rx buffer
+    USART1_RX_STA = 0;
+    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    if(0 == retry)tag = 1;//enter failed
+    return tag;
+}
+/*************************************************************
 Function Name       : AT_Get_State
 Function Description: use AT to get BLE state
 Param_in            : char *sta
@@ -418,6 +469,8 @@ void BLE_Init(void)
     BLE_Name_Change(DISABLE);
     AT_Send("+++");//enter AT mode
     AT_Send("AT+ROLE=2\r\n");//set the role: slave and master
+    AT_Send("AT+AUTO_CNT=0\r\n");
+    AT_Send("AT+DISCONNECT\r\n");
     AT_Send("AT+POWER=-28\r\n");//set the TX power as -28db
     AT_Send("AT+PACK=200,5\r\n");//set the pack range and frame as 200byte and 5ms outtime
     AT_Send("AT+CNT_INTERVAL=240\r\n");//set the connect interval as (240 * 1.25 = 300)ms
@@ -457,18 +510,16 @@ uint8_t BLE_MESH(void)
         flag = 0;
         AT_Send("AT+TTM_ROLE=0\r\n");
         AT_Send("AT+CNT_INTERVAL=480\r\n");//set the connect interval as (480 * 1.25 = 600)ms
-        AT_Send("AT+ADS=0,1,500\r\n");//set the advertise interval as 0.5s
+        AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 0.5s
         AT_Get_State("MAC");
         AT_Send("AT+EXIT\r\n");
-        uint8_t string_m[] = "m00:00 ";
+        uint8_t string_m[] = "md00:00 ";
         for (uint8_t i = 0; i < 5; i++)
         {
-            string_m[i+1] = USART1_STA_buf[i+12];
+            string_m[i+2] = USART1_STA_buf[i+12];
         }
         memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
         USART1_SendWord(string_m);
-        delay_ms_1(500);
-        USART1_SendWord("done!");
         FSM_Transfer(&system_FSM, S_STA_MESH_OK);
         return flag;
     }
@@ -479,7 +530,7 @@ uint8_t BLE_MESH(void)
     myflag.BLE_STA_flag = 0;
     flag = 0;
     AT_Send("AT+CNT_INTERVAL=480\r\n");//set the connect interval as (480 * 1.25 = 600)ms
-    AT_Send("AT+ADS=0,1,500\r\n");//set the advertise interval as 0.5s
+    AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 0.5s
     AT_Send("AT+EXIT\r\n");
     return flag;
 }

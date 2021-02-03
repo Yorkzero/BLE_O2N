@@ -182,14 +182,14 @@ void Mesh_wfm(void);
 /*************************************************************
 Function Name       : Mesh_success
 Function Description: Send networking success command to the host
-Param_in            : uint8_t *string_m
+Param_in            : uint8_t *string_m  uint8_t length  uint8_t pos
 Param_out           : 
 Return Type         : 
 Note                : 
 Author              : Yan
 Time                : 2021-01-30
 *************************************************************/
-void Mesh_success(uint8_t *string_m);
+void Mesh_success(uint8_t *string_m, uint8_t length, uint8_t pos);
 /*************************************************************
 Function Name       : Motor_Run
 Function Description: control the motor of the device

@@ -20,6 +20,7 @@ Date     : 2020-11-20
 #define USART1_RX_MAX_LEN      200  //最大接收缓存字节
 #define USART1_STA_MAX_LEN     100  //最大状态量缓存字节
 extern volatile uint8_t key_flag;   //key state flag
+extern volatile uint8_t step;       //step
 extern volatile uint32_t beep_play_time; //record the beep play time
 extern volatile uint16_t USART1_RX_STA;  //record the receive data
 extern uint8_t USART1_RX_buf[USART1_RX_MAX_LEN];//USART1 receive buffer
