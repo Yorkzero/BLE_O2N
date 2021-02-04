@@ -179,6 +179,7 @@ void Halt_to_wait(void)
     delay_ms_1(20);
     AT_Send("+++");
     AT_Send("AT+TTM_ROLE=0\r\n");
+    AT_Send("AT+POWER=0\r\n");//set the TX power as 0db
     AT_Send("AT+EXIT\r\n");
 }
 /*************************************************************
@@ -264,6 +265,9 @@ void Sleep_Handler(void)
 {
     AT_Send("+++");
     AT_Send("AT+AUTO_CNT=1\r\n");
+    AT_Send("AT+CNT_INTERVAL=480\r\n");//set the connect interval as (480 * 1.25 = 600)ms
+    // AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 1000ms
+    // AT_Send("AT+POWER=-28\r\n");//set the TX power as -3db
     AT_Send("AT+SLEEP=0,1\r\n");
     AT_Send("AT+EXIT\r\n");
     USART_Cmd(USART1, DISABLE);
@@ -540,9 +544,39 @@ void Link_End(void)
     AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
     AT_Send("AT+EXIT\r\n");//exit AT mode
     if ('1' == m_string[0])//open door
-        BLE_Send2("u 1");
+    {
+        if (0 == BLE_Send("u 1"))
+        {
+            AT_Send("+++");
+            AT_Send("AT+TTM_ROLE=0\r\n");
+            AT_Send("AT+EXIT\r\n");
+            BLE_Send("T");
+        }
+        else
+        {
+            AT_Send("+++");
+            AT_Send("AT+TTM_ROLE=0\r\n");
+            AT_Send("AT+EXIT\r\n");
+            BLE_Send("F");
+        }
+    }    
     else
-        BLE_Send2("u 0");
+    {
+        if (0 == BLE_Send("u 0"))
+        {
+            AT_Send("+++");
+            AT_Send("AT+TTM_ROLE=0\r\n");
+            AT_Send("AT+EXIT\r\n");
+            BLE_Send("T");
+        }
+        else
+        {
+            AT_Send("+++");
+            AT_Send("AT+TTM_ROLE=0\r\n");
+            AT_Send("AT+EXIT\r\n");
+            BLE_Send("F");
+        }
+    }
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
     memset(m_string, 0, sizeof(m_string));
@@ -598,7 +632,60 @@ void Link_Hop(void)
     AT_Send("+++");
     AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
     AT_Send("AT+EXIT\r\n");//exit AT mode
-    BLE_Send2(m_string);//hop msg
+    if (0 == BLE_Send(m_string))//hop msg
+    {
+        bsp_tim2_init(12500);//set 100ms outtime
+        TIM2_Cmd(ENABLE);
+        while (70 >= key_flag)//set 7s outtime
+        {
+            wfi();
+            if (USART1_RX_STA)
+            {
+                key_flag = 0;
+                TIM2_Cmd(DISABLE);
+                CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE); //disable the clk
+                break;
+            }
+        }
+        if (70 < key_flag)//outtime
+        {
+            TIM2_Cmd(DISABLE);
+            CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE); //disable the clk
+            key_flag = 0;
+        }
+        for (t = 0; t < 200; t++)//delay 200ms
+        {
+            if(USART1_RX_STA & 0x8000)
+                break;
+            delay_ms_1(1);
+        }
+        if ((USART1_RX_STA & 0x8000))//receive the data
+        {
+            USART1_SendWord("y");
+            delay_ms_1(20);
+            if ('T' == USART1_RX_buf[0])
+            {
+                AT_Send("+++");
+                AT_Send("AT+TTM_ROLE=0\r\n");
+                AT_Send("AT+EXIT\r\n");
+                BLE_Send("T");
+            }
+            else
+            {
+                AT_Send("+++");
+                AT_Send("AT+TTM_ROLE=0\r\n");
+                AT_Send("AT+EXIT\r\n");
+                BLE_Send("F");
+            }
+        }
+    }
+    else
+    {
+        AT_Send("+++");
+        AT_Send("AT+TTM_ROLE=0\r\n");
+        AT_Send("AT+EXIT\r\n");
+        BLE_Send("F");
+    }
     memset(m_string, 0, sizeof(m_string));
     free(m_string);
 }

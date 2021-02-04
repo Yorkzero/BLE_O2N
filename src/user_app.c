@@ -103,7 +103,7 @@ uint8_t BLE_Send(uint8_t *atcmd)
     uint8_t t;
     USART1_RX_STA = 0;
     memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-    uint8_t retry = 10;//number of AT command sending attempts
+    uint8_t retry = 4;//number of AT command sending attempts
     while (retry--)
     {
         if (0 == BLE_CTS_READ())
@@ -471,9 +471,9 @@ void BLE_Init(void)
     AT_Send("AT+ROLE=2\r\n");//set the role: slave and master
     AT_Send("AT+AUTO_CNT=0\r\n");
     AT_Send("AT+DISCONNECT\r\n");
-    AT_Send("AT+POWER=-28\r\n");//set the TX power as -28db
+    AT_Send("AT+POWER=0\r\n");//set the TX power as 0db
     AT_Send("AT+PACK=200,5\r\n");//set the pack range and frame as 200byte and 5ms outtime
-    AT_Send("AT+CNT_INTERVAL=240\r\n");//set the connect interval as (240 * 1.25 = 300)ms
+    AT_Send("AT+CNT_INTERVAL=24\r\n");//set the connect interval as (24 * 1.25 = 30)ms
     AT_Send("AT+ADS=1,1,50\r\n");//set the advertise interval as 50ms
     AT_Send("AT+DEV_DEL=ALL\r\n");//delet all device
     AT_Send("AT+RESTART\r\n");//restart the device
@@ -508,8 +508,9 @@ uint8_t BLE_MESH(void)
     {
         myflag.BLE_STA_flag = 0;
         flag = 0;
+        key_flag = 0;
         AT_Send("AT+TTM_ROLE=0\r\n");
-        AT_Send("AT+CNT_INTERVAL=480\r\n");//set the connect interval as (480 * 1.25 = 600)ms
+        
         AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 0.5s
         AT_Get_State("MAC");
         AT_Send("AT+EXIT\r\n");
@@ -529,7 +530,6 @@ uint8_t BLE_MESH(void)
     }
     myflag.BLE_STA_flag = 0;
     flag = 0;
-    AT_Send("AT+CNT_INTERVAL=480\r\n");//set the connect interval as (480 * 1.25 = 600)ms
     AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 0.5s
     AT_Send("AT+EXIT\r\n");
     return flag;
@@ -566,15 +566,20 @@ uint8_t BLE_FINISH_MESH(uint8_t num)
     uint8_t a[] = "1\r\n";
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
     AT_Send("AT+TTM_ROLE=1\r\n");
+    key_flag -= 1;
+    key_flag <<= 5;//key_flag *= 32
     while (num--)
     {
         a[0] = handle_list[i];
         AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
         AT_Send("AT+EXIT\r\n");
         BLE_Send("en");
+        if (!num)
+            delay_10ms_rtc(100 - key_flag);
         AT_Send("+++");
         i++;
     }
+    key_flag = 0;
     return flag;
 }
 

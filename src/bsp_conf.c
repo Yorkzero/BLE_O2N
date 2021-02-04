@@ -630,7 +630,7 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
         if ((2 == flag) || (4 == key_flag))
         {
             AT_Send("AT+S_NAME=0\r\n");//stop scaN
-            key_flag = 0;
+            delay_10ms_rtc(retry * 5);
             break;
         }
             
