@@ -43,6 +43,7 @@ enum sys_state{
     S_STA_HALT,     //halt
     S_STA_WFM,      //wait for msg
     S_STA_MOV,      //motor move
+    S_STA_LISTQ,    //list query
     S_STA_DWM,      //deal with the master msg
     S_STA_SPEC,     //link to the specified device
     S_STA_HOP,      //hop message to bound devices  
@@ -54,6 +55,7 @@ enum sys_event{
     S_EVE_WFI,      //wait for mac message
     S_EVE_RS1,      //receive sitiuation 1: itself is a designated device
     S_EVE_RS2,      //receive sitiuation 2: link call
+    S_EVE_RS3,      //receive sitiuation 3: list query
     S_EVE_TS1,      //transmitts sitiuation 1: transmitts msg to the target
     S_EVE_TS2,      //transmitts sitiuation 2: hop msg to next device
     S_EVE_SLEEP,    //end this action and go to sleep
@@ -169,6 +171,17 @@ Author              : Yan
 Time                : 2021-01-28
 *************************************************************/
 void Received_msg_process(void);
+/*************************************************************
+Function Name       : list_query
+Function Description: query list
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-02-05
+*************************************************************/
+void list_query(void);
 /*************************************************************
 Function Name       : Mesh_wfm
 Function Description: deal with mesh msg

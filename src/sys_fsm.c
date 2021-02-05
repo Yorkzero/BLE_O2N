@@ -21,6 +21,7 @@ FSM_table_t sys_table[]={
 /**/    {S_STA_HALT,     S_EVE_ITWU,     Halt_to_wait,       S_STA_WFM},
 /**/    {S_STA_WFM,      S_EVE_RS1,      Motor_Run,          S_STA_MOV},
 /**/    {S_STA_WFM,      S_EVE_RS2,      Link_msg_process,   S_STA_ONOFFLINE},
+/**/    {S_STA_WFM,      S_EVE_RS3,      list_query,         S_STA_LISTQ},
 /**/    {S_STA_DWM,      S_EVE_TS1,      Link_End,           S_STA_SPEC},
 /**/    {S_STA_DWM,      S_EVE_TS2,      Link_Hop,           S_STA_HOP},
 /**/    {S_STA_MOV,      S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
@@ -31,6 +32,7 @@ FSM_table_t sys_table[]={
 /**/    {S_STA_INIT,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
 /**/    {S_STA_MESH,     S_EVE_WFI,      Mesh_wfm,           S_STA_MESH_OK},
 /**/    {S_STA_MESH_OK,  S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_LISTQ,    S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
 };
 FSM_t system_FSM;//init system FSM
 /*-------------------- Type Declarations -------------------*/
@@ -117,7 +119,7 @@ void FSM_Init(FSM_t *pFSM, FSM_table_t *pSYS_table, State initState)
 {
     FSM_Register(pFSM, pSYS_table);
     FSM_Transfer(pFSM, initState);
-    pFSM->size = 14;
+    pFSM->size = 16;
 }
 /*************************************************************
 Function Name       : FSM_Run
@@ -163,6 +165,9 @@ void FSM_Run(void)
     case S_STA_ONOFFLINE://link msg
         FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
         break;
+    case S_STA_LISTQ://list query
+        FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
+        break;    
     default:
         break;
     }
@@ -302,7 +307,12 @@ void Received_msg_process(void)
     {
         uint8_t correct_temp = 0;
         uint8_t t = USART1_RX_STA & 0x7fff;
-        if (('u' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))
+        if ('i' == USART1_RX_buf[1])//receive "list"
+        {
+            correct_temp = 1;
+            FSM_EventHandler(&system_FSM, S_EVE_RS3);
+        }
+        if (('u' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))//receive "u 0" or "u 1"
         {
             key_flag = 0;
             while (t--)
@@ -319,7 +329,7 @@ void Received_msg_process(void)
             correct_temp = 1;
             FSM_EventHandler(&system_FSM, S_EVE_RS1);
         }
-        if ((('1' == USART1_RX_buf[0]) || ('0' == USART1_RX_buf[0]))
+        if ((('1' == USART1_RX_buf[0]) || ('0' == USART1_RX_buf[0]))//receive "1 xx:xx xx:xx ..." or "0 xx:xx xx:xx .."
              && (' ' == USART1_RX_buf[1]))
         {
             key_flag = 0;
@@ -384,6 +394,130 @@ void Received_msg_process(void)
     }
 }
 /*************************************************************
+Function Name       : list_query
+Function Description: query list
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-02-05
+*************************************************************/
+void list_query(void)
+{
+    if (0 == myflag.MAC_NUM_flag)
+    {
+        AT_Send("+++");
+        AT_Send("AT+TTM_ROLE=0\r\n");
+        AT_Get_State("MAC");
+        AT_Send("AT+EXIT\r\n");
+        uint8_t string_m[] = "md00:00 ";
+        for (uint8_t i = 0; i < 5; i++)
+        {
+            string_m[i+2] = USART1_STA_buf[i+12];
+        }
+        BLE_Send(string_m);
+        memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+        return;
+    }
+    AT_Send("+++");
+    AT_Get_Cnt_List();
+    AT_Send("AT+TTM_ROLE=1\r\n");
+    AT_Send("AT+EXIT\r\n");
+    uint8_t handler[2];
+    uint8_t cnt = 0;
+    if (1 == myflag.MAC_NUM_flag)
+    {
+        handler[0] = USART1_STA_buf[0];
+        cnt = 1;
+    }
+    else
+    {
+        handler[0] = USART1_STA_buf[0];
+        handler[1] = USART1_STA_buf[22];
+        cnt = 2;
+    }
+    uint8_t num = 0;
+    uint8_t a[] = "1\r\n";
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+    AT_Send("+++");
+    AT_Get_State("MAC");
+    AT_Send("AT+EXIT\r\n");//exit AT mode
+    uint8_t string_m[] = "00:00 ";
+    for (uint8_t i = 0; i < 5; i++)
+    {
+        string_m[i] = USART1_STA_buf[i+12];
+    }
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+    while (cnt--)
+    {
+        
+        a[0] = handler[num];
+        AT_Send("+++");
+        AT_Send("AT+TTM_ROLE=1\r\n");
+        AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
+        AT_Send("AT+EXIT\r\n");//exit AT mode
+        delay_ms_1(100);
+        USART1_SendWord("list");
+        LOOP:            
+            wfi();
+            for (uint8_t i = 0; i < 200; i++)
+            {
+                if (USART1_RX_STA & 0x8000)
+                    break;
+                delay_ms_1(5);
+            }    
+            if (USART1_RX_STA & 0x8000)
+            {
+                uint8_t t = USART1_RX_STA & 0x7fff;
+                uint8_t cur_cnt = 0;
+                uint8_t repeat_cnt = 0;
+                
+                while (t > cur_cnt)
+                {
+                    if ('m' == USART1_RX_buf[cur_cnt])//slave msg
+                    {
+                        repeat_cnt += 1;    
+                    }
+                    if (2 == repeat_cnt)
+                        break;
+                    cur_cnt++;
+                }
+                t = cur_cnt;
+                uint8_t *m_string = (uint8_t *)malloc(t);
+                uint8_t i = 0;
+                while (t--)
+                {
+                    m_string[i] = USART1_RX_buf[i];
+                    i++;
+                }
+                AT_Send("+++");
+                AT_Send("AT+TTM_ROLE=1\r\n");
+                AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
+                AT_Send("AT+EXIT\r\n");//exit AT mode
+                USART1_SendWord("y");
+                delay_ms_1(20);
+                if (' ' == m_string[1])
+                    i = 1;
+                else 
+                    i = 0;
+                if (cnt)
+                {
+                    m_string[1] = ' ';
+                }
+                AT_Send("+++");
+                AT_Send("AT+TTM_ROLE=0\r\n");
+                AT_Send("AT+EXIT\r\n");
+                BLE_Send((uint8_t*)connect2(m_string, string_m));
+                memset(m_string, 0, sizeof(m_string));
+                free(m_string);
+                if (i)
+                    goto LOOP;
+            }
+        num++;
+    }
+}
+/*************************************************************
 Function Name       : Mesh_wfm
 Function Description: deal with mesh msg
 Param_in            : 
@@ -395,57 +529,57 @@ Time                : 2021-01-31
 *************************************************************/
 void Mesh_wfm(void)
 {
-    if (!myflag.MAC_NUM_flag)//no slave
-        return;
-    AT_Send("+++");
-    AT_Get_State("MAC");
-    AT_Send("AT+TTM_ROLE=0\r\n");
-    AT_Send("AT+EXIT\r\n");
-    uint8_t string_m[] = "00:00 ";
-    for (uint8_t i = 0; i < 5; i++)
-    {
-        string_m[i] = USART1_STA_buf[i+12];
-    }
-    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-    uint8_t device_cnt = myflag.MAC_NUM_flag;//number of slaves
-    while (device_cnt)
-    {
-        wfi();
-        for (uint8_t i = 0; i < 200; i++)
-        {
-            if (USART1_RX_STA & 0x8000)
-                break;
-            delay_ms_1(1);
-        }
-        if (USART1_RX_STA & 0x8000)
-        {
-            uint8_t t = USART1_RX_STA & 0x7fff;
-            uint8_t cur_cnt = 0;
-            uint8_t last_cnt = 0;
-            while (t > cur_cnt)
-            {
-                if ('m' == USART1_RX_buf[cur_cnt])//slave msg
-                {
-                    if ('d' == USART1_RX_buf[cur_cnt + 1])//slave msg done
-                    {
-                        device_cnt--;
-                        if (device_cnt)
-                            USART1_RX_buf[cur_cnt + 1] = ' ';
-                    }
-                    if (cur_cnt != last_cnt)
-                    {
-                        Mesh_success(string_m, (cur_cnt - last_cnt), last_cnt);
-                        last_cnt = cur_cnt;
-                    }
-                }
-                cur_cnt++;
-            }
-            Mesh_success(string_m, (t - last_cnt), last_cnt);//send the last msg
-            memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-            USART1_RX_STA = 0;
-        }
-    } 
-    delay_ms_1(20);
+    // if (!myflag.MAC_NUM_flag)//no slave
+    //     return;
+    // AT_Send("+++");
+    // AT_Get_State("MAC");
+    // AT_Send("AT+TTM_ROLE=0\r\n");
+    // AT_Send("AT+EXIT\r\n");
+    // uint8_t string_m[] = "00:00 ";
+    // for (uint8_t i = 0; i < 5; i++)
+    // {
+    //     string_m[i] = USART1_STA_buf[i+12];
+    // }
+    // memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+    // uint8_t device_cnt = myflag.MAC_NUM_flag;//number of slaves
+    // while (device_cnt)
+    // {
+    //     wfi();
+    //     for (uint8_t i = 0; i < 200; i++)
+    //     {
+    //         if (USART1_RX_STA & 0x8000)
+    //             break;
+    //         delay_ms_1(1);
+    //     }
+    //     if (USART1_RX_STA & 0x8000)
+    //     {
+    //         uint8_t t = USART1_RX_STA & 0x7fff;
+            // uint8_t cur_cnt = 0;
+            // uint8_t last_cnt = 0;
+            // while (t > cur_cnt)
+            // {
+            //     if ('m' == USART1_RX_buf[cur_cnt])//slave msg
+            //     {
+            //         if ('d' == USART1_RX_buf[cur_cnt + 1])//slave msg done
+            //         {
+            //             device_cnt--;
+            //             if (device_cnt)
+            //                 USART1_RX_buf[cur_cnt + 1] = ' ';
+            //         }
+            //         if (cur_cnt != last_cnt)
+            //         {
+            //             Mesh_success(string_m, (cur_cnt - last_cnt), last_cnt);
+            //             last_cnt = cur_cnt;
+            //         }
+            //     }
+            //     cur_cnt++;
+            // }
+    //         Mesh_success(string_m, (t - last_cnt), last_cnt);//send the last msg
+    //         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    //         USART1_RX_STA = 0;
+    //     }
+    // } 
+    // delay_ms_1(20);
 }
 /*************************************************************
 Function Name       : Mesh_success

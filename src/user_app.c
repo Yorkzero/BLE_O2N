@@ -512,15 +512,15 @@ uint8_t BLE_MESH(void)
         AT_Send("AT+TTM_ROLE=0\r\n");
         
         AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 0.5s
-        AT_Get_State("MAC");
+        // AT_Get_State("MAC");
         AT_Send("AT+EXIT\r\n");
-        uint8_t string_m[] = "md00:00 ";
-        for (uint8_t i = 0; i < 5; i++)
-        {
-            string_m[i+2] = USART1_STA_buf[i+12];
-        }
-        memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-        USART1_SendWord(string_m);
+        // uint8_t string_m[] = "md00:00 ";
+        // for (uint8_t i = 0; i < 5; i++)
+        // {
+        //     string_m[i+2] = USART1_STA_buf[i+12];
+        // }
+        // memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+        // USART1_SendWord(string_m);
         FSM_Transfer(&system_FSM, S_STA_MESH_OK);
         return flag;
     }
