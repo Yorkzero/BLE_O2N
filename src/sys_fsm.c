@@ -16,19 +16,21 @@ Date     : 2021-01-28
 /*----------- Global Definitions and Declarations ----------*/
 //When adding or deleting this table, the size of the state machine must be modified synchronously
 FSM_table_t sys_table[]={
-/**/    /*cur_state     event           event_function      next_state*/
-/**/    {S_STA_INIT,    S_EVE_NOMESH,   Wait_for_mesh,      S_STA_MESH},
-/**/    {S_STA_HALT,    S_EVE_ITWU,     Halt_to_wait,       S_STA_WFM},
-/**/    {S_STA_WFM,     S_EVE_RS1,      Motor_Run,          S_STA_MOV},
-/**/    {S_STA_DWM,     S_EVE_TS1,      Link_End,           S_STA_SPEC},
-/**/    {S_STA_DWM,     S_EVE_TS2,      Link_Hop,           S_STA_HOP},
-/**/    {S_STA_MOV,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
-/**/    {S_STA_WFM,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
-/**/    {S_STA_SPEC,    S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
-/**/    {S_STA_HOP,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
-/**/    {S_STA_INIT,    S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
-/**/    {S_STA_MESH,    S_EVE_WFI,      Mesh_wfm,           S_STA_MESH_OK},
-/**/    {S_STA_MESH_OK, S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    /*cur_state      event           event_function      next_state*/
+/**/    {S_STA_INIT,     S_EVE_NOMESH,   Wait_for_mesh,      S_STA_MESH},
+/**/    {S_STA_HALT,     S_EVE_ITWU,     Halt_to_wait,       S_STA_WFM},
+/**/    {S_STA_WFM,      S_EVE_RS1,      Motor_Run,          S_STA_MOV},
+/**/    {S_STA_WFM,      S_EVE_RS2,      Link_msg_process,   S_STA_ONOFFLINE},
+/**/    {S_STA_DWM,      S_EVE_TS1,      Link_End,           S_STA_SPEC},
+/**/    {S_STA_DWM,      S_EVE_TS2,      Link_Hop,           S_STA_HOP},
+/**/    {S_STA_MOV,      S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_WFM,      S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_SPEC,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_HOP,      S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_ONOFFLINE,S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_INIT,     S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
+/**/    {S_STA_MESH,     S_EVE_WFI,      Mesh_wfm,           S_STA_MESH_OK},
+/**/    {S_STA_MESH_OK,  S_EVE_SLEEP,    Sleep_Handler,      S_STA_HALT},
 };
 FSM_t system_FSM;//init system FSM
 /*-------------------- Type Declarations -------------------*/
@@ -115,7 +117,7 @@ void FSM_Init(FSM_t *pFSM, FSM_table_t *pSYS_table, State initState)
 {
     FSM_Register(pFSM, pSYS_table);
     FSM_Transfer(pFSM, initState);
-    pFSM->size = 12;
+    pFSM->size = 14;
 }
 /*************************************************************
 Function Name       : FSM_Run
@@ -158,6 +160,9 @@ void FSM_Run(void)
     case S_STA_MESH_OK://mesh OK
         FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
         break;
+    case S_STA_ONOFFLINE://link msg
+        FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
+        break;
     default:
         break;
     }
@@ -174,13 +179,7 @@ Time                : 2021-01-28
 *************************************************************/
 void Halt_to_wait(void)
 {
-    USART1_RX_STA = 0;
-    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-    delay_ms_1(20);
-    AT_Send("+++");
-    AT_Send("AT+TTM_ROLE=0\r\n");
-    AT_Send("AT+POWER=0\r\n");//set the TX power as 0db
-    AT_Send("AT+EXIT\r\n");
+    //do some adc sampling
 }
 /*************************************************************
 Function Name       : Init_sta_detec
@@ -265,12 +264,14 @@ void Sleep_Handler(void)
 {
     AT_Send("+++");
     AT_Send("AT+AUTO_CNT=1\r\n");
+    AT_Send("AT+TTM_ROLE=0\r\n");
     AT_Send("AT+CNT_INTERVAL=480\r\n");//set the connect interval as (480 * 1.25 = 600)ms
+    AT_Send("AT+STATUS=1\r\n");
     // AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 1000ms
     // AT_Send("AT+POWER=-28\r\n");//set the TX power as -3db
     AT_Send("AT+SLEEP=0,1\r\n");
     AT_Send("AT+EXIT\r\n");
-    USART_Cmd(USART1, DISABLE);
+    // USART_Cmd(USART1, DISABLE);
     GPIO_Init(BLE_CTS_PORT, BLE_CTS_PIN, GPIO_Mode_In_PU_IT);
     CLK_PeripheralClockConfig(CLK_Peripheral_USART1, DISABLE);
     // CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE);
@@ -291,40 +292,28 @@ Time                : 2021-01-28
 *************************************************************/
 void Received_msg_process(void)
 {
-    bsp_tim2_init(12500);//set 100ms outtime
-    TIM2_Cmd(ENABLE);
-    while (50 >= key_flag)//set 5s outtime
-    {
-        wfi();
-        if (USART1_RX_STA)
-        {
-            key_flag = 0;
-            TIM2_Cmd(DISABLE);
-            CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE); //disable the clk
-            break;
-        }
-    }
-    if (50 < key_flag)//outtime
-    {
-        TIM2_Cmd(DISABLE);
-        CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE); //disable the clk
-        //check something
-        goto SLEEP;
-    }
-    
-    // halt();
     for (uint8_t i = 0; i < 200; i++)
     {
         if (USART1_RX_STA & 0x8000)
             break;
         delay_ms_1(5);
-    }
-    
+    }    
     if (USART1_RX_STA & 0x8000)
     {
         uint8_t correct_temp = 0;
+        uint8_t t = USART1_RX_STA & 0x7fff;
         if (('u' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))
         {
+            key_flag = 0;
+            while (t--)
+            {
+                USART1_STA_buf[key_flag] = USART1_RX_buf[key_flag];
+                key_flag++;
+            }
+            key_flag = 0;
+            AT_Send("+++");
+            AT_Send("AT+TTM_ROLE=0\r\n");
+            AT_Send("AT+EXIT\r\n");
             USART1_SendWord("y");
             delay_ms_1(20);
             correct_temp = 1;
@@ -333,10 +322,51 @@ void Received_msg_process(void)
         if ((('1' == USART1_RX_buf[0]) || ('0' == USART1_RX_buf[0]))
              && (' ' == USART1_RX_buf[1]))
         {
+            key_flag = 0;
+            while (t--)
+            {
+                USART1_STA_buf[key_flag] = USART1_RX_buf[key_flag];
+                key_flag++;
+            }
+            AT_Send("+++");
+            AT_Send("AT+TTM_ROLE=0\r\n");
+            AT_Send("AT+EXIT\r\n");
             USART1_SendWord("y");
             delay_ms_1(20);
             correct_temp = 1;
             FSM_Transfer(&system_FSM, S_STA_DWM);
+        }
+        //offline situation
+        if ('S' == USART1_RX_buf[0])//master offline or online
+        {
+            correct_temp = 1;
+            USART1_RX_STA = 0;
+            memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+            key_flag = 60;
+        }
+        if (('T' == USART1_RX_buf[t-5]) && (13 < t))//slave offline or online
+        {
+            correct_temp = 1;
+            FSM_EventHandler(&system_FSM, S_EVE_RS2);
+        }
+        if ('D' == USART1_RX_buf[t-1])
+        {
+            correct_temp = 1;
+            uint8_t *l_string = (uint8_t *)malloc(t);
+            uint8_t i = 0;
+            while (t--)//format xx:xx:xx:xx:xx:xx (DIS)CONNECTED
+            {
+                l_string[i] = USART1_RX_buf[i];
+                i++;
+            }
+            AT_Send("+++");
+            AT_Send("AT+TTM_ROLE=0\r\n");
+            AT_Send("AT+EXIT\r\n");
+            USART1_SendWord(l_string);
+            delay_ms_1(20);
+            memset(l_string, 0, sizeof(l_string));
+            free(l_string);
+            key_flag = 60;//sleep
         }
         if (!correct_temp)//incorrect msg
         {
@@ -347,12 +377,11 @@ void Received_msg_process(void)
             key_flag = 60;//sleep
         }
     }
-    SLEEP:
-        if (50 < key_flag)//outtime
-        {
-            key_flag = 0;
-            FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
-        }
+    if (50 < key_flag)//outtime
+    {
+        key_flag = 0;
+        FSM_EventHandler(&system_FSM, S_EVE_SLEEP);
+    }
 }
 /*************************************************************
 Function Name       : Mesh_wfm
@@ -453,16 +482,16 @@ Time                : 2021-01-28
 *************************************************************/
 void Motor_Run(void)
 {
-    if ('1' == USART1_RX_buf[2])//open door
+    if ('1' == USART1_STA_buf[2])//open door
     {
         ble_lock(DISABLE);
     }
-    if ('0' == USART1_RX_buf[2])//close door
+    if ('0' == USART1_STA_buf[2])//close door
     {
         ble_lock(ENABLE);
     }
     USART1_RX_STA = 0;
-    memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
 }
 /*************************************************************
 Function Name       : Transmitts_msg_process
@@ -476,9 +505,7 @@ Time                : 2021-01-29
 *************************************************************/
 void Transmitts_msg_process(void)
 {
-    uint8_t t = USART1_RX_STA & 0x7fff;
-    t -= 6;
-    if (8 == t)
+    if (14 == key_flag)
         myflag.HOP_STA_flag = 1;//end
     else
         myflag.HOP_STA_flag = 0;//hop
@@ -487,6 +514,35 @@ void Transmitts_msg_process(void)
         FSM_EventHandler(&system_FSM, S_EVE_TS1);
     else
         FSM_EventHandler(&system_FSM, S_EVE_TS2);
+}
+/*************************************************************
+Function Name       : Link_msg_process
+Function Description: deal with abnormal link situation
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-02-05
+*************************************************************/
+void Link_msg_process(void)
+{
+    uint8_t t = USART1_RX_STA & 0x7fff;
+    uint8_t *l_string = (uint8_t *)malloc(t-2);
+    uint8_t i = 0;
+    t -= 2;
+    while (t--)//format xx:xx:xx:xx:xx:xx (DIS)CONNECTED
+    {
+        l_string[i] = USART1_RX_buf[i];
+        i++;
+    }
+    AT_Send("+++");
+    AT_Send("AT+TTM_ROLE=0\r\n");
+    AT_Send("AT+EXIT\r\n");
+    USART1_SendWord(l_string);
+    delay_ms_1(20);
+    memset(l_string, 0, sizeof(l_string));
+    free(l_string);
 }
 /*************************************************************
 Function Name       : Link_End
@@ -500,15 +556,17 @@ Time                : 2021-01-28
 *************************************************************/
 void Link_End(void)
 {
-    uint8_t t = USART1_RX_STA & 0x7fff;
+    uint8_t t = key_flag;
+    key_flag = 0;
     uint8_t *m_string = (uint8_t *)malloc(t-6);
     uint8_t i = 0;
     t -= 6;
     while (t--)
     {
-        m_string[i] = USART1_RX_buf[i];
+        m_string[i] = USART1_STA_buf[i];
         i++;
     }
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
     AT_Send("+++");
     AT_Get_Cnt_List();
     AT_Send("AT+TTM_ROLE=1\r\n");
@@ -594,15 +652,17 @@ Time                : 2021-01-28
 *************************************************************/
 void Link_Hop(void)
 {
-    uint8_t t = USART1_RX_STA & 0x7fff;
+    uint8_t t = key_flag;
+    key_flag = 0;
     uint8_t *m_string = (uint8_t *)malloc(t-6);
     uint8_t i = 0;
     t -= 6;
     while (t--)
     {
-        m_string[i] = USART1_RX_buf[i];
+        m_string[i] = USART1_STA_buf[i];
         i++;
     }
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
     AT_Send("+++");
     AT_Get_Cnt_List();
     AT_Send("AT+TTM_ROLE=1\r\n");

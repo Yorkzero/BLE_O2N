@@ -524,9 +524,9 @@ void flowc_IRQHandler(void)
     // CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, ENABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM3, ENABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM4,ENABLE);
-    USART_Cmd(USART1, ENABLE);
+    // USART_Cmd(USART1, ENABLE);
     BLE_SEND_ENABLE();
-    delay_ms_1(100);
+    // delay_ms_1(100);
     EXTI_ClearITPendingBit(EXTI_IT_Pin1);
 }
 /*************************************************************
@@ -706,6 +706,10 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
                                 break;
                                 
                             }
+                        }
+                        else
+                        {
+                            
                         }
                         AT_Send("AT+STATUS=0\r\n");
                         
