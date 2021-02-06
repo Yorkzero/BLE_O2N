@@ -21,7 +21,7 @@ typedef struct sysFlag
 {
   uint8_t BLE_STA_flag:1;//BLE state flag 0:MESH, 1:NON-MESH
   uint8_t LOCK_STA_flag:1;//LOCK state flag 0:LOCKED, 1:UNLOCKED
-  uint8_t REPEAT_flag:1;//Determine whether there is a duplication 0:repeat, 1:no repeat
+  uint8_t ADC_STA_flag:1;//used to notify adc state 0:low power, 1: normal
   uint8_t INIT_STA_flag:1;//initialization state flag 0:not initialized yet, 1:initialized ready
   uint8_t MAC_NUM_flag:2;//used to record the number of bound mac addresses, x=0, 1, 2, 3
   uint8_t LINK_STA_flag:1;//used to enter status of msg exc 0:not ready, 1:ready

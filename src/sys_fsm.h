@@ -48,6 +48,7 @@ enum sys_state{
     S_STA_SPEC,     //link to the specified device
     S_STA_HOP,      //hop message to bound devices  
     S_STA_ONOFFLINE,//BLE notify the status changed of linked device    
+    S_STA_ALLC,     //control all device
 };
 enum sys_event{
     S_EVE_ITWU = 0, //wake uped by IT
@@ -56,6 +57,7 @@ enum sys_event{
     S_EVE_RS1,      //receive sitiuation 1: itself is a designated device
     S_EVE_RS2,      //receive sitiuation 2: link call
     S_EVE_RS3,      //receive sitiuation 3: list query
+    S_EVE_RS4,      //receive sitiuation 3: control all device
     S_EVE_TS1,      //transmitts sitiuation 1: transmitts msg to the target
     S_EVE_TS2,      //transmitts sitiuation 2: hop msg to next device
     S_EVE_SLEEP,    //end this action and go to sleep
@@ -182,6 +184,17 @@ Author              : Yan
 Time                : 2021-02-05
 *************************************************************/
 void list_query(void);
+/*************************************************************
+Function Name       : all_control
+Function Description: all control msg process
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-02-06
+*************************************************************/
+void all_control(void);
 /*************************************************************
 Function Name       : Mesh_wfm
 Function Description: deal with mesh msg

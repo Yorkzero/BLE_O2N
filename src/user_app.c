@@ -22,7 +22,7 @@ Date     : 2020-11-23
 volatile myFlag myflag = {
                             1,  //BLE state flag 0:MESH, 1:NON-MESH
                             1,  //LOCK state flag 0:LOCKED, 1:UNLOCKED
-                            1,  //Determine whether there is a duplication 0:repeat, 1:no repeat
+                            1,  //used to notify adc state 0:low power, 1: normal
                             0,  //initialization state flag 0:not initialized yet, 1:initialized ready
                             0,  //used to record the number of bound mac addresses, x=0, 1, 2, 3
                             0,  ////used to enter status of msg exc 0:not ready, 1:ready
@@ -481,7 +481,7 @@ void BLE_Init(void)
     myflag.BLE_STA_flag = 1;
     myflag.LINK_STA_flag = 0;
     myflag.MAC_NUM_flag = 0;
-    myflag.REPEAT_flag = 1;
+    myflag.ADC_STA_flag = 1;
     myflag.HOP_STA_flag = 0;
     myflag.INIT_STA_flag = 1;//init ok
     FSM_Transfer(&system_FSM, S_STA_INIT);
