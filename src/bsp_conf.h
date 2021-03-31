@@ -22,6 +22,8 @@ Date     : 2020-11-20
 extern volatile uint8_t key_flag;   //key state flag
 extern volatile uint8_t step;       //step
 extern volatile uint32_t beep_play_time; //record the beep play time
+extern volatile uint8_t callback_flag;     //message callback flag, only valid once
+extern volatile uint8_t level_flag;
 extern volatile uint16_t USART1_RX_STA;  //record the receive data
 extern uint8_t USART1_RX_buf[USART1_RX_MAX_LEN];//USART1 receive buffer
 extern uint8_t USART1_STA_buf[USART1_STA_MAX_LEN];//USART1 state buffer

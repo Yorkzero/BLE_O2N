@@ -102,9 +102,7 @@ enum
 {
     E_BEEP_MODE_INIT = 0,   //AT init
     E_BEEP_MODE_ERR,        //MESH error
-    E_BEEP_MODE_SUCCESS,    //MESH success
-    E_BEEP_MODE_RX,         //MCU receives the data
-    E_BEEP_MODE_WAIT        //beep closed after play over
+    E_BEEP_MODE_SUCCESS    //MESH success
 };
 enum 
 {

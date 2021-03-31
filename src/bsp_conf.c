@@ -25,6 +25,8 @@ uint8_t USART1_STA_buf[USART1_STA_MAX_LEN];//USART1 state buffer
 volatile uint8_t key_flag = 0;       //key state flag
 volatile uint8_t step = 0;           //step
 volatile uint32_t beep_play_time = 0; //record the beep play time
+volatile uint8_t callback_flag = 0;     //message callback flag, only valid once
+volatile uint8_t level_flag = 0;
 /**
  * @brief define the receive state of usart1 
  * @param bit [15] 0: waiting for receive, 1: received a set of data
@@ -379,8 +381,8 @@ Time                : 2020-11-26
 *************************************************************/
 void beep_play(uint8_t style)
 {
-    LEDG_L();
-    LEDR_L();
+    // LEDG_L();
+    // LEDR_L();
     switch (style)
     {
     case E_BEEP_MODE_INIT:
@@ -400,12 +402,6 @@ void beep_play(uint8_t style)
         delay_ms_1(300);
         bsp_beep_play_ms(E_BEEP_PERIOD_100US, 300);
         goto EXIT;
-        break;
-    case E_BEEP_MODE_RX:
-        
-        break;
-    case E_BEEP_MODE_WAIT:
-
         break;
     default:
         break;
@@ -614,6 +610,7 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
 {
     uint8_t flag = 0;
     uint8_t t;
+    uint8_t overflow_flag = 0;
     uint16_t retry = scan_cnt;
     uint8_t *rx_buf_ptr = USART1_RX_buf;//debug monitoring pointer
     uint8_t *sta_buf_ptr =USART1_STA_buf;//debug monitoring pointer
@@ -646,9 +643,11 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
             USART1_RX_STA = 0;
             if (200 == t)//buffer overflow
             {
-                memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
-                memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-                continue;
+                // memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+                // memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+                // continue;
+                BLE_SEND_DISABLE();
+                overflow_flag = 1;
             }
             if ('M' != USART1_RX_buf[0])//message filtter
             {
@@ -671,6 +670,13 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
                         {
                             mac_addr[i] = USART1_RX_buf[last_cnt];
                             last_cnt++;
+                        }
+                        if (overflow_flag)
+                        {
+                            overflow_flag = 0;
+                            USART1_SendWord("AT+S_NAME=0\r\n");
+                            BLE_SEND_ENABLE();
+                            delay_ms_1(50);
                         }
                         AT_Send("AT+S_NAME=0\r\n");
                         AT_Send("AT+STATUS=1\r\n");
@@ -725,6 +731,12 @@ uint8_t scan_packet_process(uint16_t scan_cnt)
         }
         USART1_RX_STA = 0;
         memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+        if (overflow_flag)//no target
+        {
+            overflow_flag = 0;
+            BLE_SEND_ENABLE();
+        }
+        
     }
     AT_Send("AT+S_NAME=0\r\n");
     //clear the rx buffer
@@ -779,6 +791,7 @@ void request_msg_process(void)
         if (('l' == USART1_RX_buf[0]) && (1 == step))//layer ID
         {
             key_flag = USART1_RX_buf[1] - '0' + 1;
+            level_flag = key_flag;
             USART1_SendWord("y");
             step = 2;
         }

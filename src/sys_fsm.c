@@ -248,7 +248,7 @@ void Init_sta_detec(void)
         }
         if ('U' == USART1_STA_buf[0])
             myflag.MAC_NUM_flag = 0;
-        AT_Send("AT+EXIT\r\n");
+        AT_Send("AT+EXIT\r\n");        
         memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
         FSM_EventHandler(&system_FSM, S_EVE_SLEEP);//halt
     }
@@ -318,7 +318,7 @@ void Sleep_Handler(void)
     AT_Send("+++");
     AT_Send("AT+AUTO_CNT=1\r\n");
     
-    AT_Send("AT+CNT_INTERVAL=480\r\n");//set the connect interval as (480 * 1.25 = 600)ms
+    AT_Send("AT+CNT_INTERVAL=240\r\n");//set the connect interval as (240 * 1.25 = 300)ms
     AT_Send("AT+STATUS=1\r\n");
     // AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 1000ms
     // AT_Send("AT+POWER=-28\r\n");//set the TX power as -3db
@@ -355,7 +355,7 @@ void Received_msg_process(void)
     {
         uint8_t correct_temp = 0;
         uint8_t t = USART1_RX_STA & 0x7fff;
-        if ('i' == USART1_RX_buf[1])//receive "list"
+        if (('i' == USART1_RX_buf[1]) && ('t' == USART1_RX_buf[3]))//receive "list"
         {
             AT_Send("+++");
             AT_Send("AT+TTM_ROLE=0\r\n");
@@ -384,6 +384,22 @@ void Received_msg_process(void)
             memset(lp_string, 0, sizeof(lp_string));
             free(lp_string);
         }
+        // if (('d' == USART1_RX_buf[0]) && 'o' == USART1_RX_buf[1])
+        // {
+        //     key_flag = 60;
+        //     correct_temp = 1;
+            
+        //     callback_flag += 1;
+        //     if (myflag.MAC_NUM_flag == callback_flag)
+        //     {
+        //         AT_Send("+++");
+        //         AT_Send("AT+TTM_ROLE=0\r\n");
+        //         AT_Send("AT+EXIT\r\n");
+        //         delay_ms_1(1000);
+        //         USART1_SendWord("donemesh");
+        //         delay_ms_1(20);
+        //     }                            
+        // }
         if ('a' == USART1_RX_buf[0])//open or close all
         {
             if ('1' == USART1_RX_buf[1])
@@ -397,6 +413,18 @@ void Received_msg_process(void)
             delay_ms_1(20);
             correct_temp = 1;
             FSM_EventHandler(&system_FSM, S_EVE_RS4);
+        }
+        if (('d' == USART1_RX_buf[0]) && ('s' == USART1_RX_buf[2]))//dislink all device
+        {
+            AT_Send("+++");
+            AT_Send("AT+TTM_ROLE=0\r\n");
+            AT_Send("AT+STATUS=0\r\n");
+            AT_Send("AT+EXIT\r\n");
+            USART1_SendWord("y");
+            delay_ms_1(20);
+            correct_temp = 1;
+            key_flag = 0;
+            all_dislink();
         }
         if (('u' == USART1_RX_buf[0]) && (' ' == USART1_RX_buf[1]))//receive "u 0" or "u 1"
         {
@@ -416,7 +444,7 @@ void Received_msg_process(void)
             FSM_EventHandler(&system_FSM, S_EVE_RS1);
         }
         if ((('1' == USART1_RX_buf[0]) || ('0' == USART1_RX_buf[0]))//receive "1 xx:xx xx:xx ..." or "0 xx:xx xx:xx .."
-             && (' ' == USART1_RX_buf[1]))
+            && (' ' == USART1_RX_buf[1]))
         {
             key_flag = 0;
             while (t--)
@@ -438,7 +466,12 @@ void Received_msg_process(void)
             correct_temp = 1;
             USART1_RX_STA = 0;
             memset(USART1_RX_buf, 0, sizeof(USART1_RX_buf));
+            if ('D' == USART1_RX_buf[1])
+                LEDR_H();
+            else
+                LEDR_L();
             key_flag = 60;
+            
         }
         if (('T' == USART1_RX_buf[t-5]) && (13 < t))//slave offline or online
         {
@@ -504,25 +537,30 @@ void list_query(void)
         }
         BLE_Send(string_m);
         memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+        LEDR_L();
         return;
     }
     AT_Send("+++");
     AT_Get_Cnt_List();
     AT_Send("AT+TTM_ROLE=1\r\n");
     AT_Send("AT+EXIT\r\n");
-    uint8_t handler[2];
+    uint8_t handler[2] = {0};
+    uint8_t *sta_ptr = USART1_STA_buf;
     uint8_t cnt = 0;
-    if (1 == myflag.MAC_NUM_flag)
+    uint8_t cur_cnt = 0;
+    uint8_t handle_list[2];
+    uint8_t pos = 0;
+    while (*sta_ptr)
     {
-        handler[0] = USART1_STA_buf[0];
-        cnt = 1;
+        if (' ' == USART1_STA_buf[cur_cnt])
+        {
+            handle_list[pos] = USART1_STA_buf[cur_cnt-1];
+            pos++;
+        }
+        cur_cnt++;
+        sta_ptr++;
     }
-    else
-    {
-        handler[0] = USART1_STA_buf[0];
-        handler[1] = USART1_STA_buf[22];
-        cnt = 2;
-    }
+    
     uint8_t num = 0;
     uint8_t a[] = "1\r\n";
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
@@ -535,10 +573,10 @@ void list_query(void)
         string_m[i] = USART1_STA_buf[i+12];
     }
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-    while (cnt--)
+    while (pos--)
     {
         
-        a[0] = handler[num];
+        a[0] = handle_list[num];
         AT_Send("+++");
         AT_Send("AT+TTM_ROLE=1\r\n");
         AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
@@ -570,31 +608,39 @@ void list_query(void)
                     cur_cnt++;
                 }
                 t = cur_cnt;
-                uint8_t *m_string = (uint8_t *)malloc(t);
+                uint8_t *m_string = (uint8_t *)malloc(t+6);
                 uint8_t i = 0;
                 while (t--)
                 {
                     m_string[i] = USART1_RX_buf[i];
                     i++;
                 }
+                m_string[i] = string_m[0];
+                m_string[i+1] = string_m[1];
+                m_string[i+2] = string_m[2];
+                m_string[i+3] = string_m[3];
+                m_string[i+4] = string_m[4];
+                m_string[i+5] = string_m[5];
+                m_string[i+6] = string_m[6];
                 AT_Send("+++");
                 AT_Send("AT+TTM_ROLE=1\r\n");
                 AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
-                AT_Send("AT+EXIT\r\n");//exit AT mode
+                AT_Send("AT+EXIT\r\n");//exit AT mode                
                 USART1_SendWord("y");
                 delay_ms_1(20);
                 if (' ' == m_string[1])
                     i = 1;
                 else 
                     i = 0;
-                if (cnt)
+                if (pos)
                 {
                     m_string[1] = ' ';
                 }
                 AT_Send("+++");
                 AT_Send("AT+TTM_ROLE=0\r\n");
                 AT_Send("AT+EXIT\r\n");
-                BLE_Send((uint8_t*)connect2(m_string, string_m));
+                // BLE_Send((uint8_t*)connect2(m_string, string_m));
+                BLE_Send(m_string);
                 memset(m_string, 0, sizeof(m_string));
                 free(m_string);
                 if (i)
@@ -602,6 +648,7 @@ void list_query(void)
             }
         num++;
     }
+    LEDR_L();
 }
 /*************************************************************
 Function Name       : all_control
@@ -647,6 +694,7 @@ void all_control(void)
             BLE_Send("a1");
         else
             BLE_Send("a0");
+        delay_ms_1(20);
         AT_Send("+++");
         cur_cnt++;
     }
@@ -655,10 +703,57 @@ void all_control(void)
         ble_lock(DISABLE);
     else
         ble_lock(ENABLE);
-        key_flag = 0;
+    key_flag = 0;
     if (!i)
         AT_Send("AT+EXIT\r\n");
     
+}
+/*************************************************************
+Function Name       : all_dislink
+Function Description: dislink all device
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-03-24
+*************************************************************/
+void all_dislink(void)
+{
+    AT_Send("+++");//enter AT mode
+    AT_Get_Cnt_List();
+    uint8_t *sta_ptr = USART1_STA_buf;
+    uint8_t cur_cnt = 0;
+    uint8_t handle_list[2];
+    uint8_t i = 0;
+    while (*sta_ptr)
+    {
+        if (' ' == USART1_STA_buf[cur_cnt])
+        {
+            handle_list[i] = USART1_STA_buf[cur_cnt-1];
+            i++;
+        }
+        cur_cnt++;
+        sta_ptr++;
+    }
+    
+    cur_cnt = 0;
+    uint8_t a[] = "1\r\n";
+    memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
+    AT_Send("AT+TTM_ROLE=1\r\n");
+    AT_Send("AT+EXIT\r\n");
+    while (i--)
+    {
+        AT_Send("+++");
+        a[0] = handle_list[cur_cnt];
+        AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
+        AT_Send("AT+EXIT\r\n");
+        BLE_Send("dislink");
+        delay_ms_1(20);        
+        cur_cnt++;
+    }    
+    BLE_Init(); 
+    delay_ms_1(100);
 }
 /*************************************************************
 Function Name       : Mesh_wfm
@@ -836,6 +931,7 @@ void Link_End(void)
     uint8_t t = key_flag;
     key_flag = 0;
     uint8_t *m_string = (uint8_t *)malloc(t-6);
+    uint8_t callback_str[] = "T XX:XX";
     uint8_t i = 0;
     t -= 6;
     while (t--)
@@ -843,6 +939,10 @@ void Link_End(void)
         m_string[i] = USART1_STA_buf[i];
         i++;
     }
+    callback_str[2] = USART1_STA_buf[2];
+    callback_str[3] = USART1_STA_buf[3];
+    callback_str[5] = USART1_STA_buf[5];
+    callback_str[6] = USART1_STA_buf[6];
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
     AT_Send("+++");
     AT_Get_Cnt_List();
@@ -885,14 +985,29 @@ void Link_End(void)
             AT_Send("+++");
             AT_Send("AT+TTM_ROLE=0\r\n");
             AT_Send("AT+EXIT\r\n");
-            BLE_Send("T");
+            if (1 != level_flag)
+            {
+                BLE_Send(callback_str);
+            }
+            else
+                USART1_SendWord(callback_str);
+            delay_ms_1(20);
+                        
+            
         }
         else
         {
             AT_Send("+++");
             AT_Send("AT+TTM_ROLE=0\r\n");
             AT_Send("AT+EXIT\r\n");
-            BLE_Send("F");
+            callback_str[0] = 'F';
+            if (1 != level_flag)
+            {
+                BLE_Send(callback_str);
+            }
+            else
+                USART1_SendWord(callback_str);
+            delay_ms_1(20);
         }
     }    
     else
@@ -901,15 +1016,28 @@ void Link_End(void)
         {
             AT_Send("+++");
             AT_Send("AT+TTM_ROLE=0\r\n");
-            AT_Send("AT+EXIT\r\n");
-            BLE_Send("T");
+            AT_Send("AT+EXIT\r\n");            
+            if (1 != level_flag)
+            {
+                BLE_Send(callback_str);
+            }
+            else
+                USART1_SendWord(callback_str);
+            delay_ms_1(20);
         }
         else
         {
             AT_Send("+++");
             AT_Send("AT+TTM_ROLE=0\r\n");
             AT_Send("AT+EXIT\r\n");
-            BLE_Send("F");
+            callback_str[0] = 'F';
+            if (1 != level_flag)
+            {
+                BLE_Send(callback_str);
+            }
+            else
+                USART1_SendWord(callback_str);
+            delay_ms_1(20);
         }
     }
     USART1_RX_STA = 0;
@@ -932,6 +1060,7 @@ void Link_Hop(void)
     uint8_t t = key_flag;
     key_flag = 0;
     uint8_t *m_string = (uint8_t *)malloc(t-6);
+    uint8_t callback_str[] = "T XX:XX";
     uint8_t i = 0;
     t -= 6;
     while (t--)
@@ -939,6 +1068,10 @@ void Link_Hop(void)
         m_string[i] = USART1_STA_buf[i];
         i++;
     }
+    callback_str[2] = USART1_STA_buf[2];
+    callback_str[3] = USART1_STA_buf[3];
+    callback_str[5] = USART1_STA_buf[5];
+    callback_str[6] = USART1_STA_buf[6];
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
     AT_Send("+++");
     AT_Get_Cnt_List();
@@ -998,6 +1131,7 @@ void Link_Hop(void)
         }
         if ((USART1_RX_STA & 0x8000))//receive the data
         {
+            
             USART1_SendWord("y");
             delay_ms_1(20);
             if ('T' == USART1_RX_buf[0])
@@ -1005,14 +1139,27 @@ void Link_Hop(void)
                 AT_Send("+++");
                 AT_Send("AT+TTM_ROLE=0\r\n");
                 AT_Send("AT+EXIT\r\n");
-                BLE_Send("T");
+                if (1 != level_flag)
+                {
+                    BLE_Send(callback_str);
+                }
+                else
+                    USART1_SendWord(callback_str);
+                delay_ms_1(20);
             }
             else
             {
                 AT_Send("+++");
                 AT_Send("AT+TTM_ROLE=0\r\n");
                 AT_Send("AT+EXIT\r\n");
-                BLE_Send("F");
+                callback_str[0] = 'F';
+                if (1 != level_flag)
+                {
+                    BLE_Send(callback_str);
+                }
+                else
+                    USART1_SendWord(callback_str);
+                delay_ms_1(20);
             }
         }
     }
@@ -1021,7 +1168,14 @@ void Link_Hop(void)
         AT_Send("+++");
         AT_Send("AT+TTM_ROLE=0\r\n");
         AT_Send("AT+EXIT\r\n");
-        BLE_Send("F");
+        callback_str[0] = 'F';
+        if (1 != level_flag)
+        {
+            BLE_Send(callback_str);
+        }
+        else
+            USART1_SendWord(callback_str);
+        delay_ms_1(20);
     }
     memset(m_string, 0, sizeof(m_string));
     free(m_string);
