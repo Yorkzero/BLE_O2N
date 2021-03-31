@@ -111,11 +111,11 @@ uint8_t BLE_Send(uint8_t *atcmd)
             USART1_SendWord(atcmd);
             delay_ms_1(2);
         }
-        for (t = 0; t < 200; t++)//delay 1s
+        for (t = 0; t < 200; t++)//delay 2s
         {
             if(USART1_RX_STA & 0x8000)
                 break;
-            delay_ms_1(5);
+            delay_ms_1(10);
         }
         if ((USART1_RX_STA & 0x8000))//receive the data
         {
@@ -477,13 +477,14 @@ void BLE_Init(void)
     AT_Send("AT+ADS=1,1,50\r\n");//set the advertise interval as 50ms
     AT_Send("AT+DEV_DEL=ALL\r\n");//delet all device
     AT_Send("AT+RESTART\r\n");//restart the device
-    AT_Send("AT+EXIT\r\n");
+    // AT_Send("AT+EXIT\r\n");
     myflag.BLE_STA_flag = 1;
     myflag.LINK_STA_flag = 0;
     myflag.MAC_NUM_flag = 0;
     myflag.ADC_STA_flag = 1;
     myflag.HOP_STA_flag = 0;
     myflag.INIT_STA_flag = 1;//init ok
+    callback_flag = 0;
     FSM_Transfer(&system_FSM, S_STA_INIT);
     beep_play(E_BEEP_MODE_INIT);
 }
@@ -520,8 +521,11 @@ uint8_t BLE_MESH(void)
         //     string_m[i+2] = USART1_STA_buf[i+12];
         // }
         // memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
-        // USART1_SendWord(string_m);
+        delay_ms_1(1000);
+        BLE_Send("donemesh");
+        delay_ms_1(20);
         FSM_Transfer(&system_FSM, S_STA_MESH_OK);
+        LEDR_H();
         return flag;
     }
     else
@@ -530,6 +534,7 @@ uint8_t BLE_MESH(void)
     }
     myflag.BLE_STA_flag = 0;
     flag = 0;
+    AT_Send("+++");
     AT_Send("AT+ADS=1,1,500\r\n");//set the advertise interval as 0.5s
     AT_Send("AT+EXIT\r\n");
     return flag;
@@ -566,19 +571,48 @@ uint8_t BLE_FINISH_MESH(uint8_t num)
     uint8_t a[] = "1\r\n";
     memset(USART1_STA_buf, 0, sizeof(USART1_STA_buf));
     AT_Send("AT+TTM_ROLE=1\r\n");
-    key_flag -= 1;
-    key_flag <<= 5;//key_flag *= 32
+    AT_Send("AT+EXIT\r\n");
+    key_flag = 0;
     while (num--)
     {
+        AT_Send("+++");
         a[0] = handle_list[i];
         AT_Send((uint8_t *)connect2("AT+TTM_HANDLE=", a));
         AT_Send("AT+EXIT\r\n");
-        BLE_Send("en");
-        if (!num)
-            delay_10ms_rtc(100 - key_flag);
-        AT_Send("+++");
+        BLE_Send("en");   
+        bsp_tim2_init(12500);
+        TIM2_Cmd(ENABLE);
+        uint8_t tick_cnt = 0;
+        while (1)
+        {
+            if (4 == tick_cnt)//delay 80s
+            {
+                TIM2_Cmd(DISABLE);
+                break;
+            }
+            if (200 == key_flag)
+            {
+                tick_cnt++;
+                key_flag = 0;
+            }
+            if (USART1_RX_STA & 0x8000)
+            {
+                USART1_SendWord("y");
+                key_flag = 0;
+                TIM2_Cmd(DISABLE);
+                break;
+            }
+                
+        }        
         i++;
-    }
+    }    
+    AT_Send("+++");
+    AT_Send("AT+TTM_ROLE=0\r\n");
+    AT_Send("AT+EXIT\r\n");
+    delay_ms_1(1000);
+    BLE_Send("donemesh");
+    delay_ms_1(20);
+    LEDR_H();
     key_flag = 0;
     return flag;
 }

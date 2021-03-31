@@ -196,6 +196,17 @@ Time                : 2021-02-06
 *************************************************************/
 void all_control(void);
 /*************************************************************
+Function Name       : all_dislink
+Function Description: dislink all device
+Param_in            : 
+Param_out           : 
+Return Type         : 
+Note                : 
+Author              : Yan
+Time                : 2021-03-24
+*************************************************************/
+void all_dislink(void);
+/*************************************************************
 Function Name       : Mesh_wfm
 Function Description: deal with mesh msg
 Param_in            : 
